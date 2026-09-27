@@ -1,0 +1,319 @@
+<!doctype html>
+<!--
+  WYB native bridge test page (placeholder). android/build.sh ships web/dist/index.html
+  instead whenever that file exists; this copy is the source of truth for the test page.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark light">
+<title>Benjamins · bridge test</title>
+<script>
+  // Defined first so no native event is lost; replaced by the real handler below.
+  window.__wyb = { q: [], emit: function (type, data) { this.q.push([type, data]); } };
+  window.T0 = performance.now();
+</script>
+<style>
+  :root { --bg:#05050A; --fg:#E8EAF2; --muted:#8A90A6; --card:#11111B; --line:#26263C; --acc:#3DDC97; --btn:#1B1B2B; color-scheme: dark; }
+  :root[data-theme=light] { --bg:#EEF0F7; --fg:#12131A; --muted:#596076; --card:#FFFFFF; --line:#D3D8E6; --acc:#0B8F59; --btn:#E3E7F2; color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); -webkit-tap-highlight-color: transparent; }
+  body {
+    font: 14px/1.35 system-ui, -apple-system, Roboto, sans-serif;
+    padding: calc(var(--native-inset-top, env(safe-area-inset-top, 0px)) + 8px)
+             calc(var(--native-inset-right, 0px) + 10px)
+             calc(max(var(--native-inset-bottom, 0px), var(--native-ime, 0px)) + 12px)
+             calc(var(--native-inset-left, 0px) + 10px);
+  }
+  /* Visual inset check: stripes exactly behind the status bar / nav bar / keyboard. */
+  .band { position: fixed; left: 0; right: 0; pointer-events: none; z-index: 9; }
+  #bandTop { top: 0; height: var(--native-inset-top, 0px); background: repeating-linear-gradient(45deg, #ff2d8a66 0 8px, #ff2d8a22 8px 16px); }
+  #bandBottom { bottom: 0; height: var(--native-inset-bottom, 0px); background: repeating-linear-gradient(45deg, #22d3ee77 0 8px, #22d3ee22 8px 16px); }
+  #bandIme { bottom: 0; height: var(--native-ime, 0px); background: #facc1540; box-shadow: inset 0 2px #facc15; }
+  h1 { font-size: 18px; margin: 4px 0 2px; }
+  h1 b { color: var(--acc); }
+  .sub { color: var(--muted); font-size: 12px; word-break: break-all; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 8px 0; }
+  .card h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size: 13px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .kv span:nth-child(even) { font-family: ui-monospace, Menlo, monospace; font-size: 12px; word-break: break-all; }
+  .big { font-size: 22px; font-weight: 700; color: var(--acc); }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .row.r3 { grid-template-columns: repeat(3, 1fr); }
+  .row.r2 { grid-template-columns: repeat(2, 1fr); }
+  button, .file { font: inherit; font-size: 13px; color: var(--fg); background: var(--btn); border: 1px solid var(--line); border-radius: 10px; padding: 9px 4px; min-height: 40px; text-align: center; }
+  button:active { background: var(--acc); color: #000; }
+  .file { display: block; position: relative; overflow: hidden; }
+  .file input { position: absolute; inset: 0; opacity: 0; }
+  input[type=text] { width: 100%; font: inherit; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  #log { font: 11px/1.35 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 40vh; overflow: auto; }
+  #navScreen { display: flex; align-items: center; justify-content: space-between; }
+  a { color: var(--acc); }
+  #envProbe { position: fixed; visibility: hidden; pointer-events: none; top: 0; left: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+</style>
+</head>
+<body>
+<div class="band" id="bandTop"></div>
+<div class="band" id="bandBottom"></div>
+<div class="band" id="bandIme"></div>
+<div id="envProbe"></div>
+
+<h1><b>$</b> Benjamins · bridge test</h1>
+<div class="sub" id="info">no native bridge</div>
+
+<div class="card">
+  <h2>Persistence (launch counter)</h2>
+  <div class="kv">
+    <span>localStorage</span><span class="big" id="lsCount">–</span>
+    <span>IndexedDB</span><span class="big" id="idbCount">–</span>
+    <span>marker LS</span><span id="markLs">–</span>
+    <span>marker IDB</span><span id="markIdb">–</span>
+  </div>
+</div>
+
+<div class="card" id="navScreen">
+  <div><h2 style="margin:0">Fake nav stack</h2><span class="big" id="depth">Home</span></div>
+  <div class="row r2" style="width:55%">
+    <button id="bPush">Push</button><button id="bPop">Pop</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Insets (CSS px)</h2>
+  <div class="kv">
+    <span>event</span><span id="insEvent">–</span>
+    <span>getInsets()</span><span id="insSync">–</span>
+    <span>CSS vars</span><span id="insVars">–</span>
+    <span>env(safe-area)</span><span id="insEnv">–</span>
+    <span>viewport</span><span id="vp">–</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Haptics</h2>
+  <div class="row">
+    <button data-h="selection">selection</button><button data-h="light">light</button>
+    <button data-h="medium">medium</button><button data-h="heavy">heavy</button>
+  </div>
+  <div class="row r3" style="margin-top:6px">
+    <button data-h="success">success</button><button data-h="warning">warning</button><button data-h="error">error</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Theme · files · share</h2>
+  <div class="row r3">
+    <button id="bTheme">Theme: dark</button><button id="bSave">Save CSV</button><button id="bSaveJson">Save JSON</button>
+  </div>
+  <div class="row r3" style="margin-top:6px">
+    <button id="bShareFile">Share file</button><button id="bShareText">Share text</button><button id="bMin">Minimize</button>
+  </div>
+  <div class="row r2" style="margin-top:6px">
+    <label class="file">Open .csv/.json<input id="fileOne" type="file" accept=".csv,.json,text/csv,application/json"></label>
+    <label class="file">Open any (multi)<input id="fileAny" type="file" multiple></label>
+  </div>
+  <div class="sub" id="fileOut" style="margin-top:4px"></div>
+</div>
+
+<div class="card">
+  <h2>Environment</h2>
+  <div class="kv">
+    <span>online</span><span id="online">–</span>
+    <span>prefers dark</span><span id="pcs">–</span>
+    <span>visibility</span><span id="vis">–</span>
+    <span>ready()</span><span id="readyAt">–</span>
+    <span>fetch</span><span id="fetchOut">–</span>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <button id="bMark">Marker</button><button id="bFetch">Fetch test</button><button id="bAlert">alert()</button><button id="bReload">Reload</button>
+  </div>
+  <div class="row r3" style="margin-top:6px">
+    <button id="bReadyMode">ready: sync</button><button id="bCrash">Crash WV</button><button id="bClear">Clear log</button>
+  </div>
+  <div style="margin-top:6px"><input type="text" id="txt" placeholder="Tap: keyboard / --native-ime test"></div>
+  <div class="sub" style="margin-top:6px"><a href="https://example.com/">https://example.com (opens browser)</a></div>
+</div>
+
+<div class="card">
+  <h2>Event log</h2>
+  <pre id="log"></pre>
+</div>
+
+<script>
+(function () {
+  var N = window.WYBNative || null;
+  function $(id) { return document.getElementById(id); }
+  function t() { return (performance.now() / 1000).toFixed(2); }
+  var lines = [];
+  function log(msg) {
+    lines.unshift(t() + ' ' + msg);
+    if (lines.length > 80) lines.length = 80;
+    $('log').textContent = lines.join('\n');
+  }
+  window.wybLog = log;
+
+  // ---- native events
+  var handlers = {
+    back: function () { log('back → pop'); setDepth(Math.max(0, depth - 1)); },
+    insets: function (d) { $('insEvent').textContent = fmt(d); readInsets(); },
+    fileSaved: function (d) { $('fileOut').textContent = 'fileSaved: ' + JSON.stringify(d); },
+    systemTheme: function (d) { readEnv(); }
+  };
+  function emit(type, data) {
+    log('event ' + type + ' ' + JSON.stringify(data));
+    if (handlers[type]) handlers[type](data || {});
+  }
+  var queued = window.__wyb.q;
+  window.__wyb = { emit: emit };
+  queued.forEach(function (e) { emit(e[0], e[1]); });
+
+  function fmt(d) { return d ? [d.top, d.right, d.bottom, d.left].join(' / ') + ' · ime ' + d.ime : '–'; }
+
+  // ---- insets readouts
+  function readInsets() {
+    if (N) $('insSync').textContent = fmt(JSON.parse(N.getInsets()));
+    var cs = getComputedStyle(document.documentElement);
+    $('insVars').textContent = ['top', 'right', 'bottom', 'left'].map(function (k) {
+      return cs.getPropertyValue('--native-inset-' + k).trim() || '∅';
+    }).join(' / ') + ' · ime ' + (cs.getPropertyValue('--native-ime').trim() || '∅');
+    var p = getComputedStyle($('envProbe'));
+    $('insEnv').textContent = [p.paddingTop, p.paddingRight, p.paddingBottom, p.paddingLeft].join(' / ');
+    $('vp').textContent = innerWidth + '×' + innerHeight + ' @' + devicePixelRatio +
+      (window.visualViewport ? ' · vv ' + Math.round(visualViewport.height) : '');
+  }
+  addEventListener('resize', readInsets);
+
+  // ---- environment
+  var mq = matchMedia('(prefers-color-scheme: dark)');
+  function readEnv() {
+    $('online').textContent = String(navigator.onLine);
+    $('pcs').textContent = String(mq.matches);
+    $('vis').textContent = document.visibilityState;
+    if (N) $('info').textContent = N.getInfo();
+  }
+  if (mq.addEventListener) mq.addEventListener('change', function () { log('prefers-color-scheme dark=' + mq.matches); readEnv(); });
+  document.addEventListener('visibilitychange', function () { log('visibilitychange ' + document.visibilityState); readEnv(); });
+
+  // ---- persistence
+  function idb(cb) {
+    var r = indexedDB.open('wyb-test', 1);
+    r.onupgradeneeded = function () { r.result.createObjectStore('kv'); };
+    r.onsuccess = function () { cb(r.result); };
+    r.onerror = function () { log('IDB error ' + (r.error && r.error.message)); };
+  }
+  var ls = (parseInt(localStorage.getItem('wyb.launches') || '0', 10) || 0) + 1;
+  localStorage.setItem('wyb.launches', String(ls));
+  $('lsCount').textContent = ls;
+  $('markLs').textContent = localStorage.getItem('wyb.marker') || '–';
+  idb(function (db) {
+    var tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'), n = 0;
+    st.get('launches').onsuccess = function (e) { n = (e.target.result || 0) + 1; st.put(n, 'launches'); };
+    st.get('marker').onsuccess = function (e) { $('markIdb').textContent = e.target.result || '–'; };
+    tx.oncomplete = function () { $('idbCount').textContent = n; };
+  });
+  $('bMark').onclick = function () {
+    var m = new Date().toISOString().slice(11, 23);
+    localStorage.setItem('wyb.marker', m);
+    $('markLs').textContent = m;
+    idb(function (db) {
+      var tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(m, 'marker');
+      tx.oncomplete = function () { $('markIdb').textContent = m; log('marker committed ' + m); };
+    });
+  };
+
+  // ---- fake navigation stack (drives setCanGoBack)
+  var depth = 0;
+  function setDepth(d) {
+    depth = d;
+    $('depth').textContent = d === 0 ? 'Home' : 'Screen ' + d;
+    if (N) N.setCanGoBack(d > 0);
+  }
+  $('bPush').onclick = function () { setDepth(depth + 1); };
+  $('bPop').onclick = function () { setDepth(Math.max(0, depth - 1)); };
+
+  // ---- theme
+  function applyTheme(mode) {
+    document.documentElement.dataset.theme = mode;
+    localStorage.setItem('wyb.theme', mode);
+    $('bTheme').textContent = 'Theme: ' + mode;
+    if (N) N.setTheme(mode, mode === 'light' ? '#EEF0F7' : '#05050A');
+  }
+  applyTheme(localStorage.getItem('wyb.theme') || 'dark');
+  $('bTheme').onclick = function () {
+    applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+    if (N) N.haptic('selection');
+  };
+
+  // ---- haptics
+  Array.prototype.forEach.call(document.querySelectorAll('[data-h]'), function (b) {
+    b.onclick = function () { if (N) N.haptic(b.dataset.h); log('haptic ' + b.dataset.h); };
+  });
+
+  // ---- files / share
+  var csv = 'date,amount,category,note\n2026-09-28,4.20,Food,"Coffee ☕"\n2026-09-28,12.99,Fun,"Movie, popcorn"\n';
+  $('bSave').onclick = function () { if (N) N.saveFile('benjamins-test.csv', 'text/csv', csv); };
+  $('bSaveJson').onclick = function () {
+    if (N) N.saveFile('benjamins-backup.json', 'application/json', JSON.stringify({ app: 'benjamins', v: 1, at: Date.now() }, null, 2));
+  };
+  $('bShareFile').onclick = function () { if (N) N.shareFile('benjamins-export.csv', 'text/csv', csv); };
+  $('bShareText').onclick = function () { if (N) N.shareText('Benjamins', 'I spent $17.19 today — tracked with Benjamins.'); };
+  $('bMin').onclick = function () { if (N) N.minimize(); };
+  function onFiles(input) {
+    var fs = Array.prototype.slice.call(input.files || []);
+    log('picked ' + fs.length + ' file(s)');
+    if (!fs.length) { $('fileOut').textContent = 'no file (cancelled)'; return; }
+    var f = fs[0], r = new FileReader();
+    r.onload = function () {
+      $('fileOut').textContent = fs.map(function (x) { return x.name + ' (' + x.size + ' B, ' + (x.type || '?') + ')'; }).join(', ') +
+        ' · first line: ' + String(r.result).split('\n')[0].slice(0, 60).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFD]/g, '·');
+    };
+    r.onerror = function () { $('fileOut').textContent = 'read error: ' + r.error; };
+    r.readAsText(f);
+    input.value = '';
+  }
+  $('fileOne').onchange = function () { onFiles(this); };
+  $('fileAny').onchange = function () { onFiles(this); };
+
+  // ---- misc
+  $('bFetch').onclick = function () {
+    var urls = ['/index.html', '/nope.png', 'https://example.com/'];
+    Promise.all(urls.map(function (u) {
+      return fetch(u, { cache: 'no-store' }).then(function (r) {
+        return u.replace('https://', '') + '→' + r.status + ' ' + (r.headers.get('content-type') || '').split(';')[0];
+      }, function (e) { return u.replace('https://', '') + '→ERR ' + e.message; });
+    })).then(function (res) { $('fetchOut').textContent = res.join(' | '); log('fetch ' + res.join(' | ')); });
+  };
+  $('bAlert').onclick = function () { alert('Hello from alert() — no URL in the title.'); };
+  $('bReload').onclick = function () { location.reload(); };
+  $('bClear').onclick = function () { lines = []; $('log').textContent = ''; };
+  $('bCrash').onclick = function () {
+    if (!confirm('Crash the WebView renderer (out of memory) to test recovery?')) return;
+    log('allocating until the renderer dies…');
+    setTimeout(function () { var hog = []; for (;;) hog.push(new Array(4e6).fill(Math.random())); }, 50);
+  };
+  var readyMode = localStorage.getItem('wyb.readyMode') || 'sync';
+  $('bReadyMode').textContent = 'ready: ' + readyMode;
+  $('bReadyMode').onclick = function () {
+    readyMode = readyMode === 'sync' ? 'raf' : 'sync';
+    localStorage.setItem('wyb.readyMode', readyMode);
+    $('bReadyMode').textContent = 'ready: ' + readyMode + ' (next start)';
+  };
+
+  // ---- boot
+  readEnv();
+  readInsets();
+  requestAnimationFrame(function () { log('first rAF at ' + Math.round(performance.now() - T0) + ' ms'); });
+  function callReady() {
+    $('readyAt').textContent = readyMode + ' @ ' + Math.round(performance.now() - T0) + ' ms after script start';
+    if (N) N.ready();
+  }
+  if (readyMode === 'raf') requestAnimationFrame(callReady); else callReady();
+  log('boot · bridge=' + !!N + ' · ' + navigator.userAgent.replace(/^.*Chrome\/(\S+).*$/, 'Chrome $1'));
+})();
+</script>
+</body>
+</html>

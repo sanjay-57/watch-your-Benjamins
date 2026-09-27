@@ -1,0 +1,213 @@
+/* ==========================================================================
+   Design tokens — "Greenback": every colour comes from a US dollar bill
+     greenback ink · Treasury-seal green · dollar-bill green · jade tint
+     currency-paper cream · linen · aged khaki · black ink
+     + the tiny red security fibres in the paper (errors / negatives only)
+   ========================================================================== */
+:root {
+  --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* safe areas: CSS env() on iOS / modern WebView, native-injected vars on Android shell */
+  --sat: max(env(safe-area-inset-top, 0px), var(--native-inset-top, 0px));
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--native-inset-bottom, 0px));
+  --sal: max(env(safe-area-inset-left, 0px), var(--native-inset-left, 0px));
+  --sar: max(env(safe-area-inset-right, 0px), var(--native-inset-right, 0px));
+  --kb: 0px;
+
+  --gutter: 16px;
+  --page-l: calc(var(--gutter) + var(--sal));
+  --page-r: calc(var(--gutter) + var(--sar));
+  --dock-h: 64px;
+  --dock-bottom: max(12px, calc(var(--sab) + 4px));
+  --dock-space: calc(var(--dock-h) + var(--dock-bottom) + 28px);
+  --maxw: 560px;
+
+  --r-xs: 10px;
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 24px;
+  --r-xl: 30px;
+  --r-sheet: 38px;
+  --r-pill: 999px;
+
+  /* motion (JS upgrades --ease-spring* to CSS linear() spring curves when supported) */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in: cubic-bezier(.55, 0, .9, .45);
+  --ease-io: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.3, 1.35, .55, 1);
+  --ease-spring-soft: cubic-bezier(.3, 1.15, .6, 1);
+  --dur-spring: 520ms;
+  --dur-fast: 180ms;
+  --dur-med: 320ms;
+
+  /* light direction for specular rims; .tilt elements get live --lx/--ly from device tilt */
+  --lx: 0;
+  --ly: 0;
+  --rim-angle: 160deg;
+
+  /* the dollar, as numbers */
+  --ink: 7 18 12;         /* black printing ink, green-biased   #07120C */
+  --forest: 18 53 36;     /* deep greenback                      #123524 */
+  --greenback: 31 90 58;  /* back-of-the-bill green ink          #1F5A3A */
+  --seal: 46 125 79;      /* Treasury seal & serial numbers      #2E7D4F */
+  --jade: 62 107 92;      /* shaded engraving                    #3E6B5C */
+  --dollar: 133 187 101;  /* "dollar bill" green                 #85BB65 */
+  --sage: 167 200 138;    /*                                     #A7C88A */
+  --mint: 207 227 196;    /* pale green print tint               #CFE3C4 */
+  --paper: 242 240 230;   /* currency paper                      #F2F0E6 */
+  --linen: 227 223 203;   /*                                     #E3DFCB */
+  --khaki: 205 191 134;   /* aged paper                          #CDBF86 */
+  --olive: 110 123 78;    /*                                     #6E7B4E */
+  --fiber-red: 184 50 62; /* red security fibres                 #B8323E */
+}
+
+/* ---------------------------------------------------------------- dark: black ink night */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #07120c;
+  --bg-elev: #0e1d15;
+  --t1: #f2f0e4;
+  --t2: rgba(236, 233, 214, .70);
+  --t3: rgba(236, 233, 214, .54);
+  --t4: rgba(236, 233, 214, .24);
+  --sep: rgba(207, 227, 196, .10);
+  --fill-1: rgba(143, 168, 134, .26);
+  --fill-2: rgba(143, 168, 134, .17);
+  --fill-3: rgba(143, 168, 134, .10);
+  --on-color: #0b1a10;      /* text/icons on coloured surfaces (they're light in dark mode) */
+
+  --pos: #9fd47c;
+  --pos-rgb: 159 212 124;
+  --neg: #e5897f;
+  --neg-rgb: 229 137 127;
+  --warn: #e2cb7e;
+  --warn-rgb: 226 203 126;
+  --xfer: #8fc4b1;
+  --xfer-rgb: 143 196 177;
+  --spend: #cdbf86;
+  --spend-rgb: 205 191 134;
+  --m-cash: #85bb65;
+  --m-cash-rgb: 133 187 101;
+  --m-upi: #7fbfa9;
+  --m-upi-rgb: 127 191 169;
+  --m-card: #d2c38c;
+  --m-card-rgb: 210 195 140;
+
+  /* glass material: green-tinted, cream specular */
+  --g-tint: rgba(18, 40, 28, .34);
+  --g-tint-strong: rgba(11, 26, 18, .66);
+  --g-tint-thick: rgba(9, 21, 14, .86);
+  --g-sheen: linear-gradient(180deg, rgba(242, 240, 228, .085) 0%, rgba(242, 240, 228, .02) 42%, rgba(242, 240, 228, .035) 100%);
+  --g-hl: rgba(242, 240, 228, .26);
+  --g-hl-2: rgba(242, 240, 228, .06);
+  --g-line: rgba(242, 240, 228, .10);
+  --g-rim-a: rgba(242, 240, 228, .55);
+  --g-rim-b: rgba(242, 240, 228, .05);
+  --g-rim-c: rgba(242, 240, 228, .24);
+  --g-shadow: 0 1px 1px rgba(0, 0, 0, .22), 0 16px 44px -16px rgba(0, 0, 0, .75);
+  --g-shadow-lg: 0 2px 4px rgba(0, 0, 0, .25), 0 30px 80px -20px rgba(0, 0, 0, .8);
+  --g-blur: 22px;
+  --g-sat: 160%;
+  --g-bright: 1.04;
+
+  /* aurora: greenback, dollar green, jade, olive */
+  --au1: 31 90 58;
+  --au2: 133 187 101;
+  --au3: 62 107 92;
+  --au4: 110 123 78;
+  --au-o: .5;
+  --au-grain: .05;
+
+  --shadow-text: 0 1px 12px rgba(0, 0, 0, .25);
+  --scrim: rgba(0, 0, 0, .45);
+  --engrave: rgba(207, 227, 196, .11);  /* guilloché line colour */
+}
+
+/* ---------------------------------------------------------------- light: currency paper */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f0e6;
+  --bg-elev: #fbfaf4;
+  --t1: #0f1a13;
+  --t2: rgba(28, 48, 36, .74);
+  --t3: rgba(28, 48, 36, .58);
+  --t4: rgba(28, 48, 36, .24);
+  --sep: rgba(31, 90, 58, .12);
+  --fill-1: rgba(95, 120, 90, .17);
+  --fill-2: rgba(95, 120, 90, .11);
+  --fill-3: rgba(95, 120, 90, .07);
+  --on-color: #f7f5ea;      /* coloured surfaces are deep inks in light mode */
+
+  --pos: #1e7a45;
+  --pos-rgb: 30 122 69;
+  --neg: #b8323e;
+  --neg-rgb: 184 50 62;
+  --warn: #8a6d1e;
+  --warn-rgb: 138 109 30;
+  --xfer: #2f6f5e;
+  --xfer-rgb: 47 111 94;
+  --spend: #7c6f36;
+  --spend-rgb: 124 111 54;
+  --m-cash: #2e7d4f;
+  --m-cash-rgb: 46 125 79;
+  --m-upi: #2f6f5e;
+  --m-upi-rgb: 47 111 94;
+  --m-card: #8c7b3e;
+  --m-card-rgb: 140 123 62;
+
+  --g-tint: rgba(253, 252, 246, .46);
+  --g-tint-strong: rgba(251, 250, 243, .76);
+  --g-tint-thick: rgba(252, 251, 246, .90);
+  --g-sheen: linear-gradient(180deg, rgba(255, 255, 250, .6) 0%, rgba(255, 255, 250, .12) 45%, rgba(255, 255, 250, .28) 100%);
+  --g-hl: rgba(255, 255, 250, .98);
+  --g-hl-2: rgba(255, 255, 250, .45);
+  --g-line: rgba(255, 255, 250, .7);
+  --g-rim-a: rgba(255, 255, 250, 1);
+  --g-rim-b: rgba(255, 255, 250, .25);
+  --g-rim-c: rgba(255, 255, 250, .85);
+  --g-shadow: 0 1px 2px rgba(20, 60, 35, .07), 0 16px 40px -18px rgba(25, 70, 40, .28);
+  --g-shadow-lg: 0 2px 6px rgba(20, 60, 35, .08), 0 30px 70px -20px rgba(25, 70, 40, .34);
+  --g-blur: 24px;
+  --g-sat: 150%;
+  --g-bright: 1.02;
+
+  /* aurora: mint, sage, linen, pale green */
+  --au1: 207 227 196;
+  --au2: 167 200 138;
+  --au3: 227 223 203;
+  --au4: 190 214 176;
+  --au-o: .85;
+  --au-grain: .035;
+
+  --shadow-text: none;
+  --scrim: rgba(10, 30, 18, .24);
+  --engrave: rgba(31, 90, 58, .10);
+}
+
+/* ---------------------------------------------------------------- accents (all dollar inks)
+   default = greenback; unknown values (e.g. old saved accents) fall back to it */
+:root { --accent-rgb: 133 187 101; --accent-2-rgb: 46 125 79; }
+[data-theme="light"] { --accent-rgb: 31 90 58; --accent-2-rgb: 46 125 79; }
+[data-accent="seal"] { --accent-rgb: 111 196 132; --accent-2-rgb: 31 90 58; }
+[data-accent="jade"] { --accent-rgb: 127 196 174; --accent-2-rgb: 62 107 92; }
+[data-accent="khaki"] { --accent-rgb: 215 199 138; --accent-2-rgb: 110 123 78; }
+[data-theme="light"][data-accent="seal"] { --accent-rgb: 46 125 79; --accent-2-rgb: 31 90 58; }
+[data-theme="light"][data-accent="jade"] { --accent-rgb: 47 111 94; --accent-2-rgb: 62 107 92; }
+[data-theme="light"][data-accent="khaki"] { --accent-rgb: 124 111 54; --accent-2-rgb: 110 123 78; }
+:root, [data-accent] { --accent: rgb(var(--accent-rgb)); --accent-2: rgb(var(--accent-2-rgb)); }
+
+/* ---------------------------------------------------------------- material quality */
+[data-glass="solid"] {
+  --g-tint: rgba(16, 32, 23, .95);
+  --g-tint-strong: rgba(13, 27, 19, .97);
+  --g-tint-thick: rgba(11, 23, 16, .98);
+  --au-o: .38;
+}
+[data-glass="solid"][data-theme="light"] {
+  --g-tint: rgba(252, 251, 246, .94);
+  --g-tint-strong: rgba(252, 251, 246, .97);
+  --g-tint-thick: rgba(252, 251, 246, .98);
+  --au-o: .55;
+}

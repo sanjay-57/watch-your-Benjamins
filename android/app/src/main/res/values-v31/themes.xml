@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ system splash screen: same background as the web app's first frame. -->
+    <style name="Base.Benjamins" parent="Base.Benjamins.Window">
+        <item name="android:windowSplashScreenBackground">@color/wyb_bg_dark</item>
+    </style>
+</resources>

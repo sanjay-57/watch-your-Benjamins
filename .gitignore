@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+web/dist/
+releases/Benjamins-PWA/
+*.log
+android/test-shots/
+ios/test-shots/
+android/app/build/
+android/build/
+android/.gradle/
+ios/build/

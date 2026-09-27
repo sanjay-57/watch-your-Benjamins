@@ -1,0 +1,180 @@
+/* ==========================================================================
+   Polish: micro-interactions, chart animation, transitions, form details
+   ========================================================================== */
+:root { --ring-bg: #0f1d15; --row-solid: #0e1c14; }
+[data-theme="light"] { --ring-bg: #f4f2e8; --row-solid: #fbfaf4; }
+.ebadge .m { box-shadow: 0 0 0 2.5px var(--ring, var(--ring-bg)); }
+
+/* sparkline */
+.hero-spark svg { clip-path: inset(0 100% 0 0); animation: spark-reveal 1.5s var(--ease-out) .15s forwards; }
+@keyframes spark-reveal { to { clip-path: inset(0 0 0 0); } }
+.spark-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--dc);
+  box-shadow: 0 0 0 3px rgb(var(--bg-rgb) / .6), 0 0 14px var(--dc);
+  opacity: 0;
+  animation: fade-in .3s ease 1.5s forwards;
+}
+.spark-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--dc);
+  opacity: 0;
+  animation: ping 2.4s var(--ease-out) 1.8s infinite;
+}
+@keyframes ping { 0% { transform: scale(.4); opacity: .8; } 80%, 100% { transform: scale(1.6); opacity: 0; } }
+[data-theme="light"] .spark-dot { box-shadow: 0 0 0 3px rgba(255, 255, 255, .8), 0 0 12px var(--dc); }
+
+@keyframes ring-in { from { stroke-dashoffset: var(--C); } }
+
+/* theme switch: circular reveal via View Transitions */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+/* first-run hint on the add button */
+.fab.hint::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--accent-rgb) / .9);
+  animation: halo 2s var(--ease-out) infinite;
+  pointer-events: none;
+}
+@keyframes halo { 0% { transform: scale(.9); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+
+/* stacked amount + time in rows */
+.tx .amount, .tx .sub-amt { display: block; }
+
+/* sheets receive programmatic focus for a11y — no ring */
+.sheet:focus, .sheet:focus-visible { outline: none; }
+
+/* credit card: <button> would vertically centre its content */
+.ccard { display: flex; flex-direction: column; justify-content: flex-start; }
+
+/* one global compact title above the progressive-blur edge */
+.view .topbar { display: none; }
+#topbar { z-index: 6; opacity: var(--p, 0); }
+
+/* swipe rows */
+.tx-swipe:not(.swiping) .tx-actions { visibility: hidden; }
+.tx-swipe.swiping .tx { background: var(--row-solid); }
+
+/* logo */
+.logo { display: block; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.onb-glyph { width: 100%; height: 100%; filter: drop-shadow(0 30px 50px rgba(0, 0, 0, .45)); }
+[data-theme="light"] .onb-glyph { filter: drop-shadow(0 26px 40px rgba(18, 53, 36, .28)); }
+.onb-logo .orb { display: grid; place-items: center; padding: 0; border-radius: 50%; overflow: hidden; }
+.onb-logo .orb .mglyph { box-shadow: none; }
+.onb-logo .orb .i { width: 22px; height: 22px; }
+.about .logo { margin: 0 auto 10px; }
+
+/* hero label is a button */
+.hero-label { padding: 4px 0; }
+.hero-label .i:last-child { opacity: .6; }
+
+/* inline icons inside form labels */
+.field-label .i { display: inline-block; vertical-align: -2px; margin-right: 5px; }
+
+/* bigger glyphs */
+.mglyph.lg { width: 60px; height: 60px; border-radius: 20px; }
+.mglyph.lg .i { width: 30px; height: 30px; }
+
+/* selects inside fields */
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 22px;
+  background: linear-gradient(45deg, transparent 50%, var(--t3) 50%) calc(100% - 9px) 50% / 5px 5px no-repeat,
+              linear-gradient(135deg, var(--t3) 50%, transparent 50%) calc(100% - 4px) 50% / 5px 5px no-repeat;
+}
+.field select option { color: #000; }
+
+/* segmented controls inside list cells */
+.cell .seg { flex: none; }
+.cell .swatches { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.cell .swatch { width: 26px; height: 26px; }
+
+/* disabled icon buttons */
+.icon-btn:disabled { pointer-events: none; }
+
+/* inputs: kill iOS inner shadow & autofill tint */
+input, select, textarea { -webkit-appearance: none; appearance: none; border-radius: 0; }
+input:-webkit-autofill { -webkit-text-fill-color: var(--t1); transition: background-color 9999s; }
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; }
+
+/* sheets: content fade while the sheet is behind another */
+.sheet.behind .sheet-body { pointer-events: none; }
+
+/* tx sheet: compact on short screens */
+@media (max-height: 700px) {
+  .amount-disp { min-height: 78px; padding-top: 6px; }
+  .amount-disp .big { font-size: 46px; }
+  .tx-sec { margin-top: 10px; }
+  .keypad { gap: 6px; }
+}
+
+/* reduced motion: no ambient loops */
+[data-motion="reduced"] .fab.hint::after,
+[data-motion="reduced"] .spark-dot::after,
+[data-motion="reduced"] .onb-logo,
+[data-motion="reduced"] .onb-logo .orb { animation: none !important; }
+[data-motion="reduced"] .hero-spark svg { clip-path: none; animation: none; }
+[data-motion="reduced"] .spark-dot { opacity: 1; animation: none; }
+
+/* iOS home-screen web app: the status bar text is always white (black-translucent) —
+   give it a soft scrim in light mode so the clock & battery stay legible */
+.ios-pwa[data-theme="light"] #app::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--sat) + 10px);
+  z-index: 7;
+  pointer-events: none;
+  background: linear-gradient(rgba(7, 18, 12, .42), rgba(7, 18, 12, 0));
+}
+
+/* banknote guilloché engraving on the money surfaces */
+.hero, .networth {
+  background-image: var(--guilloche, none), var(--g-sheen);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 380px 380px, auto;
+  background-position: right -190px top -190px, 0 0;
+}
+.ccard { --engrave-bg: var(--guilloche-card) right -150px top -150px / 300px 300px no-repeat; }
+.ccard.light { --engrave-bg: var(--guilloche-card-ink) right -150px top -150px / 300px 300px no-repeat; }
+.ccard.light .cc-name, .ccard.light .cc-v { text-shadow: none; }
+
+/* chart scrubbing */
+#daily-chart { touch-action: pan-y; cursor: crosshair; }
+.chart .bar-r.scrub { fill: rgb(var(--accent-rgb)) !important; filter: drop-shadow(0 0 8px rgb(var(--accent-rgb) / .8)); }
+
+/* quick buttons */
+.qchip.qadd {
+  justify-content: center;
+  width: 58px;
+  padding: 0;
+  color: var(--accent);
+  background: rgb(var(--accent-rgb) / .08);
+  box-shadow: inset 0 0 0 1.5px rgb(var(--accent-rgb) / .35);
+  border-radius: 20px;
+}
+.qchip.qadd .i { width: 24px; height: 24px; stroke-width: 2.2; }
+.qchip .e .i { width: 22px; height: 22px; color: var(--xfer); }
+.qchip.logged .e { animation: logged .6s var(--ease-spring); }
+@keyframes logged { 30% { transform: scale(1.22) rotate(-6deg); } 60% { transform: scale(.94); } }
+
+/* card editor: wrapping chips + mini-card design grid, aligned with the fields */
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.design-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.design-grid button { aspect-ratio: 1.586; border-radius: 10px; }

@@ -1,0 +1,116 @@
+/* ==========================================================================
+   Liquid Glass material
+   .glass          — standard translucent panel (cards, groups, bars)
+   .glass-strong   — thicker material for sheets / dialogs / menus
+   .glass-clear    — nearly clear lens for controls floating over content
+   [data-lg]       — JS adds SVG refraction (Chromium) via backdrop-filter:url()
+   ========================================================================== */
+.glass,
+.glass-strong,
+.glass-clear {
+  position: relative;
+  background-color: var(--g-tint);
+  background-image: var(--g-sheen);
+  -webkit-backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat)) brightness(var(--g-bright));
+  backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat)) brightness(var(--g-bright));
+  box-shadow:
+    inset 0 1px .5px var(--g-hl),
+    inset 0 -1px 1px var(--g-hl-2),
+    inset 0 0 0 .5px var(--g-line),
+    var(--g-shadow);
+  border-radius: var(--r-lg);
+}
+.glass-strong {
+  background-color: var(--g-tint-strong);
+  -webkit-backdrop-filter: blur(34px) saturate(190%) brightness(var(--g-bright));
+  backdrop-filter: blur(34px) saturate(190%) brightness(var(--g-bright));
+  box-shadow:
+    inset 0 1px .5px var(--g-hl),
+    inset 0 -1px 1px var(--g-hl-2),
+    inset 0 0 0 .5px var(--g-line),
+    var(--g-shadow-lg);
+}
+.glass-clear {
+  background-color: rgba(255, 255, 255, .02);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 55%);
+  -webkit-backdrop-filter: blur(6px) saturate(170%) brightness(1.08);
+  backdrop-filter: blur(6px) saturate(170%) brightness(1.08);
+}
+[data-theme="light"] .glass-clear { background-color: rgba(255, 255, 255, .22); }
+
+/* specular rim: a 1px gradient ring that brightens toward the light source */
+.glass::before,
+.glass-strong::before,
+.glass-clear::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(var(--rim-angle),
+      var(--g-rim-a) 0%,
+      var(--g-rim-b) 28%,
+      transparent 50%,
+      var(--g-rim-b) 72%,
+      var(--g-rim-c) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  z-index: 1;
+}
+
+/* elements that react to device tilt / pointer (JS writes --lx/--ly on them) */
+.tilt { --rim-angle: calc(160deg + var(--lx, 0) * 42deg); }
+
+/* optional inner caustic glow for hero elements */
+.glass-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at calc(20% + var(--lx) * 20%) -10%, rgba(255, 255, 255, .16), transparent 55%),
+    radial-gradient(90% 60% at 110% 120%, rgb(var(--accent-rgb) / .16), transparent 60%);
+  mix-blend-mode: plus-lighter;
+  z-index: 0;
+}
+[data-theme="light"] .glass-glow::after {
+  background:
+    radial-gradient(120% 70% at calc(20% + var(--lx) * 20%) -10%, rgba(255, 255, 255, .7), transparent 55%),
+    radial-gradient(90% 60% at 110% 120%, rgb(var(--accent-rgb) / .12), transparent 60%);
+  mix-blend-mode: normal;
+}
+
+/* tinted glass (accent / semantic) */
+.glass.tint,
+.glass-clear.tint {
+  background-color: rgb(var(--tint, var(--accent-rgb)) / .78);
+  background-image: linear-gradient(180deg, rgba(255, 255, 250, .28), rgba(255, 255, 250, 0) 55%);
+  color: var(--on-color);
+}
+[data-theme="light"] .glass.tint { background-color: rgb(var(--tint, var(--accent-rgb)) / .88); }
+
+/* press physics */
+.press {
+  transition: transform .5s var(--ease-spring), filter .3s var(--ease-out), background-color .3s var(--ease-out);
+}
+.press:active,
+.press.is-pressed {
+  transform: scale(.955);
+  transition-duration: .12s, .12s, .12s;
+  transition-timing-function: var(--ease-out);
+}
+.press-lg:active,
+.press-lg.is-pressed { transform: scale(.975); }
+
+/* ---- quality tiers ---- */
+[data-glass="solid"] .glass,
+[data-glass="solid"] .glass-strong,
+[data-glass="solid"] .glass-clear {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+[data-glass="solid"] .glass-clear { background-color: var(--g-tint); }

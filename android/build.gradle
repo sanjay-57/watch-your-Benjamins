@@ -1,0 +1,11 @@
+// AGP is put on the build classpath directly (instead of the plugins {} DSL) so a
+// build works offline from the local Gradle cache without a plugin-marker lookup.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.11.0'
+    }
+}

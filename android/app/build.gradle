@@ -1,0 +1,65 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Release signing: android/keystore/keystore.properties (git-ignored), see keystore/README.md.
+def keystoreDir = rootProject.file('keystore')
+def keystorePropsFile = new File(keystoreDir, 'keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.isFile()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+android {
+    namespace = 'app.watchyourbenjamins'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = 'app.watchyourbenjamins'
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropsFile.isFile()) {
+                storeFile = new File(keystoreDir, keystoreProps.getProperty('storeFile'))
+                storePassword = keystoreProps.getProperty('storePassword')
+                keyAlias = keystoreProps.getProperty('keyAlias')
+                keyPassword = keystoreProps.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig = keystorePropsFile.isFile() ? signingConfigs.release : null
+            vcsInfo.include = false
+        }
+        debug {
+            // Lets a debug build live next to the signed release build without a
+            // signature clash (which would force an uninstall = data loss).
+            applicationIdSuffix = '.debug'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    // No third-party dependencies, so there is nothing to report.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+}

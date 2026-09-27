@@ -1,0 +1,18 @@
+# Gradle / Android Studio
+.gradle/
+build/
+/app/build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+.cxx/
+captures/
+
+# Release signing secrets (see keystore/README.md — back them up elsewhere!)
+keystore/*.jks
+keystore/*.keystore
+keystore/keystore.properties
+
+# Emulator test screenshots
+test-shots/

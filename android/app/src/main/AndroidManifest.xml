@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Deliberately NO permissions — not even INTERNET. The UI is served from the APK's
+      assets (MainActivity.serveAsset), so the process never needs to open a socket and
+      the OS guarantees that data cannot leave the phone from this app.
+    -->
+
+    <!--
+      allowBackup=false: no cloud (Google Drive) backup of the expense data. On Android 12+
+      device-to-device transfer (new phone setup) still migrates the data.
+    -->
+    <application
+        android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Benjamins"
+        tools:ignore="DataExtractionRules"
+        tools:targetApi="33">
+
+        <!-- Keep WebView from reporting usage metrics or doing Safe Browsing URL lookups. -->
+        <meta-data
+            android:name="android.webkit.WebView.MetricsOptOut"
+            android:value="true" />
+        <meta-data
+            android:name="android.webkit.WebView.EnableSafeBrowsing"
+            android:value="false" />
+
+        <!-- configChanges: the WebView (and all in-memory web state) must survive rotation,
+             dark-mode switches, keyboards, display size, font scale and locale changes. -->
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|touchscreen|uiMode|density|fontScale|locale|layoutDirection|colorMode|mcc|mnc|fontWeightAdjustment|grammaticalGender"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Minimal read-only provider for files handed to the share sheet (no FileProvider). -->
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Benjamins themed-icon silhouette (Android 13+): unfinished pyramid + capstone with the eye. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M42.23 62.04L45.07 57.27L62.93 57.27L65.77 62.04ZM38.81 67.79L41.87 62.65L66.13 62.65L69.19 67.79ZM35.13 73.95L38.45 68.39L69.55 68.39L72.87 73.95ZM54 42.27L61.99 55.69L46.01 55.69ZM49.77 51.46Q54 48.36 58.23 51.46Q54 54.56 49.77 51.46ZM52.67 51.46a1.33 1.33 0 1 0 2.66 0a1.33 1.33 0 1 0 -2.66 0Z" />
+</vector>

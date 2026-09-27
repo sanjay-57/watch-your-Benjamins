@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Edge-to-edge window, dark launch look (#07120C). No action bar, no forced darkening. -->
+    <style name="Base.Benjamins.Window" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/wyb_bg_dark</item>
+        <item name="android:colorBackground">@color/wyb_bg_dark</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="28">shortEdges</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
+    </style>
+
+    <!-- Re-declared in values-v31 to add the splash-screen attributes. -->
+    <style name="Base.Benjamins" parent="Base.Benjamins.Window" />
+
+    <!--
+      App theme. The window always stays dark here; the only thing that follows the system
+      night mode (see values-night) is isLightTheme, which is what WebView (apps targeting
+      API 33+) uses for the CSS prefers-color-scheme media query.
+    -->
+    <style name="Theme.Benjamins" parent="Base.Benjamins">
+        <item name="android:isLightTheme" tools:targetApi="29">true</item>
+    </style>
+
+    <!--
+      Applied at cold start once the web app switched to light mode (WYBNative.setTheme),
+      and handed to the API 33+ splash screen, so launch never flashes the wrong colour.
+    -->
+    <style name="Theme.Benjamins.Light">
+        <item name="android:windowBackground">@color/wyb_bg_light</item>
+        <item name="android:colorBackground">@color/wyb_bg_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/wyb_bg_light</item>
+    </style>
+</resources>

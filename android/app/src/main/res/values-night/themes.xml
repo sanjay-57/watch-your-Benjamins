@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- System dark mode: WebView reports prefers-color-scheme: dark. -->
+    <style name="Theme.Benjamins" parent="Base.Benjamins">
+        <item name="android:isLightTheme" tools:targetApi="29">false</item>
+    </style>
+</resources>

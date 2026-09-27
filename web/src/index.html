@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-accent="violet" data-glass="liquid" data-motion="full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Benjamins</title>
+<meta name="description" content="Watch Your Benjamins — a beautiful, private, offline expense tracker for cash, UPI and credit cards.">
+<meta name="application-name" content="Benjamins">
+<meta name="theme-color" content="#07120c">
+<meta name="color-scheme" content="dark light">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Benjamins">
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>
+/* Pre-paint boot: resolve theme/material/insets before the first frame (no flash). */
+(function () {
+  var d = document.documentElement, ui = {}, info = null, n = window.WYBNative;
+  try { ui = JSON.parse(localStorage.getItem('wyb:ui') || '{}') || {}; } catch (e) {}
+  if (n) {
+    try { info = JSON.parse(n.getInfo()); } catch (e) {}
+    try {
+      var i = JSON.parse(n.getInsets());
+      ['top', 'right', 'bottom', 'left'].forEach(function (k) { d.style.setProperty('--native-inset-' + k, (i[k] || 0) + 'px'); });
+      d.style.setProperty('--native-ime', (i.ime || 0) + 'px');
+    } catch (e) {}
+  }
+  var mm = window.matchMedia ? function (q) { return matchMedia(q).matches; } : function () { return false; };
+  var sysDark = info && typeof info.dark === 'boolean' ? info.dark : mm('(prefers-color-scheme: dark)');
+  d.setAttribute('data-theme', ui.theme === 'light' || ui.theme === 'dark' ? ui.theme : (sysDark ? 'dark' : 'light'));
+  d.setAttribute('data-accent', ui.accent || 'violet');
+  d.setAttribute('data-glass', ui.glass || 'liquid');
+  d.setAttribute('data-motion', ui.motion || (mm('(prefers-reduced-motion: reduce)') ? 'reduced' : 'full'));
+  if (ui.hide) d.setAttribute('data-private', 'true');
+  d.setAttribute('data-platform', n ? 'android' : (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.wyb ? 'ios' : 'web'));
+  window.__WYB_BOOT = { ui: ui, info: info, sysDark: sysDark };
+})();
+</script>
+<style>/*@CSS*/</style>
+</head>
+<body>
+<div id="app">
+  <div class="aurora" id="aurora" aria-hidden="true"><i class="au-grain"></i></div>
+  <main class="views" id="views">
+    <section class="view" id="view-home" data-view="home" role="tabpanel" aria-label="Home"></section>
+    <section class="view" id="view-activity" data-view="activity" role="tabpanel" aria-label="Activity" hidden></section>
+    <section class="view" id="view-insights" data-view="insights" role="tabpanel" aria-label="Insights" hidden></section>
+    <section class="view" id="view-wallet" data-view="wallet" role="tabpanel" aria-label="Wallet" hidden></section>
+  </main>
+  <div class="edge edge-top" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="edge edge-bottom" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="topbar" id="topbar" aria-hidden="true"><div class="topbar-title" id="topbar-title"></div></div>
+  <nav class="dock" id="dock" aria-label="Main">
+    <div class="tabbar glass" id="tabbar" role="tablist" data-lg="tabbar">
+      <span class="tab-drop" id="tabdrop" aria-hidden="true"></span>
+      <button class="tab" role="tab" data-tab="home" aria-selected="true" aria-controls="view-home"><svg class="i"><use href="#i-home"/></svg><span>Home</span></button>
+      <button class="tab" role="tab" data-tab="activity" aria-selected="false" aria-controls="view-activity"><svg class="i"><use href="#i-activity"/></svg><span>Activity</span></button>
+      <button class="tab" role="tab" data-tab="insights" aria-selected="false" aria-controls="view-insights"><svg class="i"><use href="#i-insights"/></svg><span>Insights</span></button>
+      <button class="tab" role="tab" data-tab="wallet" aria-selected="false" aria-controls="view-wallet"><svg class="i"><use href="#i-wallet"/></svg><span>Wallet</span></button>
+    </div>
+    <button class="fab glass tint" id="fab" aria-label="Add transaction" data-lg="fab"><svg class="i"><use href="#i-plus"/></svg></button>
+  </nav>
+</div>
+<div class="scrim" id="scrim"></div>
+<div id="sheets"></div>
+<div id="overlay"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
+<noscript><p style="padding:40px;text-align:center;color:#fff">Benjamins needs JavaScript to run.</p></noscript>
+<script>/*@JS*/</script>
+</body>
+</html>

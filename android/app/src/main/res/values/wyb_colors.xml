@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keep in sync with docs/NATIVE_BRIDGE.md and MainActivity.BG_DARK / BG_LIGHT. -->
+    <color name="wyb_bg_dark">#07120C</color>
+    <color name="wyb_bg_light">#F2F0E6</color>
+</resources>

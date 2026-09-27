@@ -1,0 +1,14 @@
+{
+  "name": "benjamins-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Watch Your Benjamins — offline liquid-glass expense tracker (single-file web bundle for Android/iOS shells + PWA)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --dev && node serve.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

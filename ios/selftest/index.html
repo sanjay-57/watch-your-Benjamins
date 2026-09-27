@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Benjamins iOS shell self-test</title>
+<!--
+  Placeholder page for the iOS shell (replaced by web/dist/index.html when it exists).
+  Auto-runs a self-test on load and renders the results; the buttons exercise every bridge call.
+  URL params (DEBUG launch argument -WYBQuery '...'):
+    theme=light                 start in the light theme (calls setTheme light)
+    theme=skip                  don't call setTheme (shows the theme persisted by the shell)
+    noready=1                   never post {cmd:'ready'} (tests the 1.2 s cover timeout)
+    action=save|share|text|alert|confirm|prompt   trigger that call 1.5 s after load
+-->
+<style>
+  :root { --bg:#05050A; --fg:#ECEEF6; --muted:#8B91A8; --card:#11131D; --line:#232638;
+          --ok:#3DDC84; --bad:#FF5C6C; --warn:#FFC24B; --accent:#7C95FF; color-scheme:dark; }
+  html.light { --bg:#EEF0F7; --fg:#11131D; --muted:#5B6178; --card:#FFFFFF; --line:#D7DAE6; color-scheme:light; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); }
+  body { font:15px/1.35 -apple-system, system-ui, sans-serif; overflow:hidden;
+         -webkit-text-size-adjust:100%; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .scroll { position:fixed; inset:0; overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box;
+            padding:calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 14px)
+                    calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 14px); }
+  /* translucent bars exactly env(safe-area-inset-top/bottom) tall, to check insets on screenshots */
+  .sa { position:fixed; left:0; right:0; pointer-events:none; z-index:5; background:rgba(124,149,255,.22); }
+  .sa.top { top:0; height:env(safe-area-inset-top); border-bottom:1px dashed var(--accent); }
+  .sa.bottom { bottom:0; height:env(safe-area-inset-bottom); border-top:1px dashed var(--accent); }
+  #probe { position:fixed; visibility:hidden; pointer-events:none;
+           padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  h1 { font-size:21px; margin:2px 0 0; letter-spacing:-.2px; }
+  .sub { color:var(--muted); font-size:12px; word-break:break-all; margin-top:2px; }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:8px 12px; }
+  .tile .k { color:var(--muted); font-size:13px; font-weight:600; }
+  .tile .v { font-size:46px; font-weight:800; line-height:1.05; font-variant-numeric:tabular-nums; }
+  .tile .d { color:var(--muted); font-size:11px; min-height:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:2px 12px; margin:10px 0; }
+  .row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:5px 0;
+         border-bottom:1px solid var(--line); font-size:16px; }
+  .row:last-child { border-bottom:0; }
+  .row .l { color:var(--fg); white-space:nowrap; }
+  .row .r { text-align:right; font-weight:700; word-break:break-all; font-size:15px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  .insets { font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 4px; }
+  #log { font:12px/1.4 ui-monospace, Menlo, monospace; background:var(--card); border:1px solid var(--line);
+         border-radius:12px; padding:8px 10px; min-height:60px; max-height:160px; overflow:auto; word-break:break-all; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  button, label.btn { font:inherit; font-size:14px; font-weight:600; color:var(--fg); background:var(--card);
+         border:1px solid var(--line); border-radius:10px; padding:9px 12px; }
+  button:active { background:var(--line); }
+  input[type=file] { font-size:13px; color:var(--muted); max-width:100%; }
+</style>
+</head>
+<body>
+<div class="sa top"></div><div class="sa bottom"></div><div id="probe"></div>
+<div class="scroll">
+  <h1>Benjamins iOS shell self-test</h1>
+  <div class="sub" id="where"></div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">localStorage launches</div><div class="v" id="lsCount">…</div><div class="d" id="lsPrev"></div></div>
+    <div class="tile"><div class="k">IndexedDB launches</div><div class="v" id="idbCount">…</div><div class="d" id="idbPrev"></div></div>
+  </div>
+
+  <div class="card" id="checks"></div>
+
+  <div class="card"><div class="row"><span class="l">safe area (t r b l)</span><span class="r insets" id="insets">…</span></div>
+  <div class="row"><span class="l">env() in JS</span><span class="r" id="insetsNote">…</span></div>
+  <div class="row"><span class="l">viewport</span><span class="r" id="viewport">…</span></div></div>
+
+  <h2>Native → JS events</h2>
+  <div id="log"></div>
+
+  <h2>Bridge calls</h2>
+  <div class="btns">
+    <button data-haptic="light">light</button><button data-haptic="medium">medium</button>
+    <button data-haptic="heavy">heavy</button><button data-haptic="selection">selection</button>
+    <button data-haptic="success">success</button><button data-haptic="warning">warning</button>
+    <button data-haptic="error">error</button>
+  </div>
+  <div class="btns" style="margin-top:8px">
+    <button id="bDark">setTheme dark</button><button id="bLight">setTheme light</button>
+    <button id="bReady">ready</button>
+  </div>
+  <div class="btns" style="margin-top:8px">
+    <button id="bSave">saveFile</button><button id="bShare">shareFile</button><button id="bText">shareText</button>
+  </div>
+  <div class="btns" style="margin-top:8px">
+    <button id="bAlert">alert()</button><button id="bConfirm">confirm()</button><button id="bPrompt">prompt()</button>
+  </div>
+  <h2>&lt;input type=file&gt;</h2>
+  <input type="file" id="file">
+  <div class="sub" id="fileOut"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var t0 = performance.now();
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.wyb;
+
+  // ---------- event log + the native -> JS entry point ----------
+  function stamp() {
+    var d = new Date();
+    return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+  function logLine(text, cls) {
+    var line = document.createElement('div');
+    line.textContent = stamp() + '  ' + text;
+    if (cls) line.className = cls;
+    $('log').insertBefore(line, $('log').firstChild);
+  }
+  window.__wyb = {
+    emit: function (type, data) {
+      logLine('<- ' + type + ' ' + JSON.stringify(data), type === 'fileSaved' && data && !data.ok ? 'warn' : 'ok');
+    }
+  };
+  document.addEventListener('visibilitychange', function () { logLine('(visibilitychange ' + document.visibilityState + ')'); });
+  if (window.matchMedia) {
+    var mq = matchMedia('(prefers-color-scheme: dark)');
+    (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(function (e) {
+      logLine('(prefers-color-scheme dark=' + e.matches + ')');
+    });
+  }
+
+  function post(msg) {
+    if (!bridge) { logLine('no bridge: ' + JSON.stringify(msg), 'bad'); return false; }
+    try { bridge.postMessage(msg); return true; } catch (e) { logLine('postMessage failed: ' + e, 'bad'); return false; }
+  }
+
+  // ---------- results table ----------
+  function row(label, state, value) {
+    var r = document.createElement('div');
+    r.className = 'row';
+    var l = document.createElement('span'); l.className = 'l'; l.textContent = label;
+    var v = document.createElement('span'); v.className = 'r ' + (state === true ? 'ok' : state === false ? 'bad' : 'warn');
+    v.textContent = value;
+    r.appendChild(l); r.appendChild(v);
+    $('checks').appendChild(r);
+    return v;
+  }
+  function setRow(el, state, value) { el.className = 'r ' + (state === true ? 'ok' : state === false ? 'bad' : 'warn'); el.textContent = value; }
+
+  // ---------- environment ----------
+  $('where').textContent = location.href + '  ·  ' + (window.__WYB_IOS ? '__WYB_IOS ' + JSON.stringify(window.__WYB_IOS) : 'no __WYB_IOS');
+  row('bridge (messageHandlers.wyb)', !!bridge, bridge ? 'present' : 'missing');
+  row('window.__WYB_IOS', !!window.__WYB_IOS, window.__WYB_IOS ? 'v' + window.__WYB_IOS.version + ' b' + window.__WYB_IOS.build : 'missing');
+  row('isSecureContext', window.isSecureContext === true, String(window.isSecureContext) + ' (' + location.protocol + ')');
+
+  var uuidOk = !!(window.crypto && typeof crypto.randomUUID === 'function');
+  var uuid = '';
+  try { uuid = uuidOk ? crypto.randomUUID() : ''; } catch (e) { uuidOk = false; uuid = String(e); }
+  row('crypto.randomUUID', uuidOk, uuidOk ? uuid.slice(0, 13) + '…' : 'unavailable ' + uuid);
+  var subtleRow = row('crypto.subtle SHA-256', null, 'running…');
+
+  // localStorage launch counter (synchronous)
+  var lsRow = row('localStorage', null, '…');
+  try {
+    var n = (parseInt(localStorage.getItem('wyb.selftest.launches'), 10) || 0) + 1;
+    var prev = localStorage.getItem('wyb.selftest.last');
+    localStorage.setItem('wyb.selftest.launches', String(n));
+    localStorage.setItem('wyb.selftest.last', new Date().toISOString());
+    $('lsCount').textContent = n;
+    $('lsPrev').textContent = prev ? 'prev ' + prev.slice(11, 19) + 'Z' : 'first launch';
+    setRow(lsRow, true, 'ok, counter ' + n);
+  } catch (e) {
+    $('lsCount').textContent = 'ERR';
+    setRow(lsRow, false, String(e));
+  }
+  var idbRow = row('IndexedDB', null, 'running…');
+  var persistRow = row('storage.persist()', null, 'running…');
+  row('serviceWorker in navigator', null, String('serviceWorker' in navigator));
+  row('navigator.share', null, typeof navigator.share);
+  var hapticOk = post({ cmd: 'haptic', kind: 'success' });
+  var themeParam = params.get('theme'); // light | skip (keep the theme persisted by the shell) | default dark
+  var light = themeParam === 'light';
+  if (light) document.documentElement.classList.add('light');
+  var themeOk = themeParam === 'skip' || post({ cmd: 'setTheme', mode: light ? 'light' : 'dark', bg: light ? '#EEF0F7' : '#05050A' });
+  row('haptic + setTheme posted', hapticOk && themeOk, !(hapticOk && themeOk) ? 'failed' :
+      themeParam === 'skip' ? 'ok (setTheme skipped)' : 'ok (' + (light ? 'light' : 'dark') + ')');
+  var readyRow = row('ready posted', null, params.get('noready') ? 'skipped (noready=1)' : 'pending…');
+
+  // ---------- safe area ----------
+  // WKWebView may deliver env(safe-area-inset-*) only after the first frame; CSS picks the values up
+  // automatically, JS can watch an element padded with env() through a ResizeObserver.
+  function readInsets() {
+    var cs = getComputedStyle($('probe'));
+    return [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(function (v) { return parseFloat(v); });
+  }
+  var startInsets = readInsets(), nonZeroAt = null;
+  function measure() {
+    var v = readInsets();
+    $('insets').textContent = v.join(' / ') + ' px';
+    $('viewport').textContent = innerWidth + '×' + innerHeight + ' @' + devicePixelRatio + 'x';
+    if (nonZeroAt === null && v.some(Boolean)) nonZeroAt = Math.round(performance.now() - t0);
+    $('insetsNote').textContent = 'start ' + startInsets.join('/') +
+      (nonZeroAt === null ? '' : nonZeroAt === 0 ? ' (ready at start)' : ', set +' + nonZeroAt + ' ms');
+  }
+  measure();
+  addEventListener('resize', measure);
+  if (window.ResizeObserver) new ResizeObserver(measure).observe($('probe'), { box: 'border-box' });
+
+  // ---------- async checks ----------
+  if (window.crypto && crypto.subtle) {
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode('benjamins')).then(function (buf) {
+      var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      setRow(subtleRow, true, hex.slice(0, 12) + '…');
+    }, function (e) { setRow(subtleRow, false, String(e)); });
+  } else {
+    setRow(subtleRow, false, 'unavailable');
+  }
+
+  function idbCounter() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('indexedDB missing')); return; }
+      var req = indexedDB.open('wyb-selftest', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onerror = function () { reject(req.error); };
+      req.onblocked = function () { reject(new Error('blocked')); };
+      req.onsuccess = function () {
+        var db = req.result, count = 0, previous = null;
+        var tx = db.transaction('kv', 'readwrite');
+        var store = tx.objectStore('kv');
+        var get = store.get('launches');
+        get.onsuccess = function () {
+          var old = get.result || { n: 0, at: null };
+          previous = old.at;
+          count = old.n + 1;
+          store.put({ n: count, at: new Date().toISOString() }, 'launches');
+        };
+        tx.oncomplete = function () { db.close(); resolve({ n: count, previous: previous }); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error || new Error('aborted')); };
+      };
+    });
+  }
+  idbCounter().then(function (r) {
+    $('idbCount').textContent = r.n;
+    $('idbPrev').textContent = r.previous ? 'prev ' + r.previous.slice(11, 19) + 'Z' : 'first launch';
+    setRow(idbRow, true, 'ok, counter ' + r.n);
+  }, function (e) {
+    $('idbCount').textContent = 'ERR';
+    setRow(idbRow, false, String(e && (e.name + ': ' + e.message) || e));
+  });
+
+  if (navigator.storage && navigator.storage.persist) {
+    Promise.all([navigator.storage.persist(), navigator.storage.estimate ? navigator.storage.estimate() : null]).then(function (r) {
+      var quota = r[1] && r[1].quota ? ', quota ' + Math.round(r[1].quota / 1048576) + ' MB' : '';
+      setRow(persistRow, r[0] === true ? true : null, String(r[0]) + quota);
+    }, function (e) { setRow(persistRow, false, String(e)); });
+  } else {
+    setRow(persistRow, null, 'unsupported');
+  }
+
+  // ---------- ready after the first render ----------
+  if (!params.get('noready')) {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        var ok = post({ cmd: 'ready' });
+        setRow(readyRow, ok, ok ? '+' + Math.round(performance.now() - t0) + ' ms (script ran at +' + Math.round(t0) + ' ms)' : 'failed');
+      });
+    });
+  }
+
+  // ---------- buttons ----------
+  Array.prototype.forEach.call(document.querySelectorAll('[data-haptic]'), function (b) {
+    b.addEventListener('click', function () { post({ cmd: 'haptic', kind: b.dataset.haptic }); });
+  });
+  function theme(mode) {
+    document.documentElement.classList.toggle('light', mode === 'light');
+    post({ cmd: 'setTheme', mode: mode, bg: mode === 'light' ? '#EEF0F7' : '#05050A' });
+  }
+  var sampleCsv = 'date,amount,note\n2026-09-28,12.50,"Coffee, beans"\n2026-09-28,100.00,Groceries\n';
+  var actions = {
+    save: function () { post({ cmd: 'saveFile', name: 'benjamins-backup.json', mime: 'application/json',
+                               content: JSON.stringify({ app: 'benjamins', exported: new Date().toISOString(), uuid: uuid }, null, 2) }); },
+    share: function () { post({ cmd: 'shareFile', name: 'benjamins-export.csv', mime: 'text/csv', content: sampleCsv }); },
+    text: function () { post({ cmd: 'shareText', subject: 'Benjamins', text: 'Spent $112.50 this week.' }); },
+    alert: function () { alert('alert() works'); logLine('alert() returned'); },
+    confirm: function () { logLine('confirm() -> ' + confirm('confirm() works?')); },
+    prompt: function () { logLine('prompt() -> ' + JSON.stringify(prompt('prompt() works?', 'yes'))); }
+  };
+  $('bDark').onclick = function () { theme('dark'); };
+  $('bLight').onclick = function () { theme('light'); };
+  $('bReady').onclick = function () { post({ cmd: 'ready' }); };
+  $('bSave').onclick = actions.save;
+  $('bShare').onclick = actions.share;
+  $('bText').onclick = actions.text;
+  $('bAlert').onclick = actions.alert;
+  $('bConfirm').onclick = actions.confirm;
+  $('bPrompt').onclick = actions.prompt;
+  $('file').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    f.text().then(function (t) { $('fileOut').textContent = f.name + ' (' + f.size + ' B): ' + t.slice(0, 80); });
+  });
+
+  var action = params.get('action');
+  if (action && actions[action]) setTimeout(function () { logLine('auto action: ' + action); actions[action](); }, 1500);
+})();
+</script>
+</body>
+</html>
