@@ -35,6 +35,7 @@
   var sysDark = info && typeof info.dark === 'boolean' ? info.dark : mm('(prefers-color-scheme: dark)');
   d.setAttribute('data-theme', ui.theme === 'light' || ui.theme === 'dark' ? ui.theme : (sysDark ? 'dark' : 'light'));
   d.setAttribute('data-accent', ui.accent || 'violet');
+  d.setAttribute('data-note', ui.note === 'dirham' || ui.note === 'rupee' ? ui.note : 'dollar');
   d.setAttribute('data-glass', ui.glass || 'liquid');
   d.setAttribute('data-motion', ui.motion || (mm('(prefers-reduced-motion: reduce)') ? 'reduced' : 'full'));
   if (ui.hide) d.setAttribute('data-private', 'true');

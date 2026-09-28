@@ -23,6 +23,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.OpenableColumns;
 import android.util.Log;
+import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -84,6 +85,9 @@ public final class MainActivity extends Activity {
     private boolean lightTheme;
     private int bgColor = BG_DARK;
 
+    // Fastest refresh rate of the display at its current resolution (0 = unknown).
+    private float peakRefreshRate;
+
     // The first frame is held back until the page calls ready() (or the timeout fires).
     private boolean holdFirstDraw;
     private long createdAt;
@@ -128,6 +132,7 @@ public final class MainActivity extends Activity {
             w.setAttributes(lp);
         }
         applyWindowTheme();
+        requestPeakRefreshRate();
 
         WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
         web = createWebView();
@@ -180,6 +185,7 @@ public final class MainActivity extends Activity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        requestPeakRefreshRate(); // resolution may have changed (display-size settings)
         boolean dark = isNight(newConfig);
         if (dark != systemDark) {
             systemDark = dark;
@@ -238,6 +244,11 @@ public final class MainActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (Build.VERSION.SDK_INT >= 33) s.setAlgorithmicDarkeningAllowed(false);
 
+        // Android 15+ renders views that don't ask for more at the "normal" frame-rate category
+        // (60 Hz on a 90/120 Hz panel) even when the panel mode is faster; the vote only counts
+        // while the WebView is actually drawing, so an idle page still lets the display relax.
+        if (Build.VERSION.SDK_INT >= 35 && peakRefreshRate > 0) v.setRequestedFrameRate(peakRefreshRate);
+
         v.setWebViewClient(new Client());
         v.setWebChromeClient(new Chrome());
         v.addJavascriptInterface(new Bridge(), "WYBNative");
@@ -250,6 +261,31 @@ public final class MainActivity extends Activity {
             return view.onApplyWindowInsets(withoutIme(insets));
         });
         return v;
+    }
+
+    /**
+     * Picks the fastest display mode at the current resolution (90/120 Hz panels otherwise leave
+     * WebView content at 60 Hz). The user's peak-refresh-rate setting still caps it.
+     */
+    @SuppressWarnings("deprecation")
+    private void requestPeakRefreshRate() {
+        Display d = Build.VERSION.SDK_INT >= 30 ? getDisplay() : getWindowManager().getDefaultDisplay();
+        if (d == null) return;
+        Display.Mode cur = d.getMode(), best = cur;
+        for (Display.Mode m : d.getSupportedModes()) {
+            if (m.getPhysicalWidth() == cur.getPhysicalWidth() && m.getPhysicalHeight() == cur.getPhysicalHeight()
+                    && m.getRefreshRate() > best.getRefreshRate()) {
+                best = m;
+            }
+        }
+        peakRefreshRate = best.getRefreshRate();
+        Window w = getWindow();
+        WindowManager.LayoutParams lp = w.getAttributes();
+        if (lp.preferredDisplayModeId != best.getModeId()) {
+            lp.preferredDisplayModeId = best.getModeId();
+            w.setAttributes(lp);
+        }
+        Log.i(TAG, "display mode " + best.getModeId() + " @ " + best.getRefreshRate() + " Hz");
     }
 
     @SuppressWarnings("deprecation")

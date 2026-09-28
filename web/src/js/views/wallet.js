@@ -25,11 +25,11 @@ export function renderWallet(root) {
       </header>
 
       <section class="networth glass glass-glow tilt" style="--n:1">
-        <div class="caps">Net worth</div>
-        <div class="big amt ${T.net < 0 ? 'neg' : ''}">${esc(money(T.net))}</div>
+        <div class="caps">Balance</div>
+        <div class="big amt ${T.balance < 0 ? 'neg' : ''}">${esc(money(T.balance))}</div>
         <div class="cols">
-          <div><div class="k">You have</div><div class="v amt pos">${esc(money(T.liquid + T.cardCredit))}</div></div>
-          <div><div class="k">You owe</div><div class="v amt ${T.cardDue ? 'neg' : ''}">${esc(money(T.cardDue))}</div></div>
+          <div><div class="k">Card dues</div><div class="v amt ${T.cardDue ? 'neg' : ''}">${esc(money(T.cardDue))}</div></div>
+          <div><div class="k">Card limit left</div><div class="v amt ${T.cardAvail < 0 ? 'neg' : ''}">${T.limit ? esc(money(T.cardAvail)) : '—'}</div></div>
         </div>
       </section>
 
@@ -68,7 +68,7 @@ export function renderWallet(root) {
         <div class="glass group">${archived.map(a => `<button class="cell" data-act="acct" data-id="${esc(a.id)}">${acctGlyph(a)}<span class="label">${esc(a.name)}<small class="amt">${esc(money(b.get(a.id) || 0))}</small></span>${icon('chev-r', 'chev')}</button>`).join('')}</div>
       </div>` : ''}
 
-      <p class="t-foot t3" style="text-align:center;margin:26px 20px 0;line-height:1.5">Card spends lower your net worth right away. Paying a card bill is a transfer, so it’s never counted as spending twice.</p>
+      <p class="t-foot t3" style="text-align:center;margin:26px 20px 0;line-height:1.5">Card spends only use up the card’s limit — your Cash and GPay balance stays the same. Paying the card bill moves money out of your balance, and it’s never counted as spending twice.</p>
     </div>
   </div>
   <div class="topbar"><div class="topbar-title">Wallet</div></div>`;

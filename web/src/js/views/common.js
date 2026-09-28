@@ -1,5 +1,6 @@
 // Shared render helpers for views and sheets.
 import { html, raw, esc, hexToRgb } from '../core/util.js';
+import { noteInk } from '../ui/notes.js';
 import { money } from '../core/money.js';
 import { fmtDay, fmtTime } from '../core/dates.js';
 import { account, category, CARD_THEMES, LIGHT_CARDS } from '../core/store.js';
@@ -21,7 +22,7 @@ export function acctRGB(a) {
 /** Glyph colour for a fixed (non-theme) background: cards carry their own ink. */
 export const acctOn = a => (a?.type === 'card' ? (LIGHT_CARDS.has(a.theme) ? '#0f1a13' : '#f7f5ea') : 'var(--on-color)');
 export const acctGlyph = (a, cls = '') => raw(`<span class="mglyph ${cls}" style="--c:${acctRGB(a)};--on:${acctOn(a)}">${icon(acctIcon(a))}</span>`);
-export const catRGB = c => hexToRgb(c?.color || '#7E8A80');
+export const catRGB = c => hexToRgb(noteInk(c?.color || '#7E8A80'));
 
 export function acctSub(a, bal) {
   if (a.type === 'card') return a.last4 ? `•••• ${a.last4}` : 'Credit card';

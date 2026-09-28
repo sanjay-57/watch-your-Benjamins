@@ -20,7 +20,7 @@ function paint(px, v = 0, scaleBoost = 1) {
   const stretch = clamp(Math.abs(v) / 2600, 0, 0.32);
   const sx = (1 + stretch) * scaleBoost;
   const sy = (1 - stretch * 0.45) * scaleBoost;
-  drop.style.width = w + 'px';
+  if (drop.style.width !== w + 'px') drop.style.width = w + 'px'; // a layout change: only when needed
   drop.style.transform = `translate3d(${px}px,0,0) scale(${sx.toFixed(3)},${sy.toFixed(3)})`;
 }
 
@@ -48,9 +48,8 @@ export function initTabbar(select) {
   new ResizeObserver(() => { const gg = geom(current); w = gg.w; spring?.stop(); paint(gg.x); }).observe(bar);
 
   // tap / drag scrubbing
-  let pid = null, startX = 0, moved = false, hovered = null;
+  let pid = null, startX = 0, moved = false, hovered = null, r = null;
   const tabAt = cx => {
-    const r = bar.getBoundingClientRect();
     const rel = cx - r.left;
     return tabs.reduce((best, t) => (Math.abs(t.offsetLeft + t.offsetWidth / 2 - rel) < Math.abs(best.offsetLeft + best.offsetWidth / 2 - rel) ? t : best), tabs[0]);
   };
@@ -59,6 +58,7 @@ export function initTabbar(select) {
     pid = e.pointerId;
     startX = e.clientX;
     moved = false;
+    r = bar.getBoundingClientRect(); // once per gesture: reading it per move forces a layout each frame
     hovered = tabAt(e.clientX);
     bar.setPointerCapture?.(e.pointerId);
   });
@@ -71,7 +71,6 @@ export function initTabbar(select) {
       haptic('light');
     }
     if (!moved) return;
-    const r = bar.getBoundingClientRect();
     const target = clamp(e.clientX - r.left - w / 2, 4, r.width - w - 4);
     spring?.stop();
     const dt = 16;

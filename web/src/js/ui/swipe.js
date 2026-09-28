@@ -22,7 +22,7 @@ export function closeOpenRow() {
 
 /** onDelete(id, rowEl) is called for a full swipe or a tap on the revealed action. */
 export function attachSwipe(container, onDelete) {
-  let row = null, sx = 0, sy = 0, x0 = 0, dx = 0, mode = null, lastX = 0, lastT = 0, vel = 0, armed = false;
+  let row = null, sx = 0, sy = 0, x0 = 0, dx = 0, mode = null, lastX = 0, lastT = 0, vel = 0, armed = false, w = 0;
 
   container.addEventListener('touchstart', e => {
     const r = e.target.closest('.tx-swipe');
@@ -45,9 +45,9 @@ export function attachSwipe(container, onDelete) {
       if (Math.abs(ddx) < 8 && Math.abs(ddy) < 8) return;
       mode = Math.abs(ddx) > Math.abs(ddy) * 1.2 ? 'h' : 'v';
       if (mode === 'v') { row = null; return; }
+      w = row.offsetWidth; // once per gesture, before any writes (a read per move forces a layout)
     }
     if (e.cancelable) e.preventDefault();
-    const w = row.offsetWidth;
     dx = Math.min(0, x0 + ddx);
     if (dx > 0) dx = 0;
     // resistance past the reveal width

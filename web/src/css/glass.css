@@ -106,6 +106,17 @@
 .press-lg:active,
 .press-lg.is-pressed { transform: scale(.975); }
 
+/* Blink (Android WebView / Chrome) re-runs every backdrop filter on every frame in which
+   anything behind or in front of it moves, i.e. every card on every scroll frame. In-page glass
+   only ever sits over the aurora, a soft 1/5-resolution gradient that a blur cannot visibly
+   change, so there it keeps the colour lift and drops the (costly, multi-pass) blur. Sheets,
+   the dock and the scroll edges, which float over real content, keep theirs. */
+.blink .view .glass,
+.blink .view .glass-clear {
+  -webkit-backdrop-filter: saturate(var(--g-sat)) brightness(var(--g-bright));
+  backdrop-filter: saturate(var(--g-sat)) brightness(var(--g-bright));
+}
+
 /* ---- quality tiers ---- */
 [data-glass="solid"] .glass,
 [data-glass="solid"] .glass-strong,

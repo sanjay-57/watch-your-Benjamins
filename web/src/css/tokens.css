@@ -122,7 +122,10 @@
 
   --shadow-text: 0 1px 12px rgba(0, 0, 0, .25);
   --scrim: rgba(0, 0, 0, .45);
-  --engrave: rgba(207, 227, 196, .11);  /* guilloché line colour */
+  --engrave: rgba(207, 227, 196, .14);  /* guilloché line colour (read by ui/engrave.js) */
+  --night-rgb: 7 18 12;                 /* status-bar fade under the notch */
+  --present-bg: #030805;                /* black frame behind a raised sheet */
+  --title-grad: linear-gradient(100deg, #cfe3c4, #85bb65 45%, #a7c88a 90%);
 }
 
 /* ---------------------------------------------------------------- light: currency paper */
@@ -183,7 +186,9 @@
 
   --shadow-text: none;
   --scrim: rgba(10, 30, 18, .24);
-  --engrave: rgba(31, 90, 58, .10);
+  --engrave: rgba(31, 90, 58, .16);
+  --shade-rgb: 25 70 40;                /* tint of light-mode drop shadows */
+  --title-grad: linear-gradient(100deg, #123524, #2e7d4f 50%, #3e6b5c 95%);
 }
 
 /* ---------------------------------------------------------------- accents (all dollar inks)

@@ -19,6 +19,7 @@ export const refractionSupported = (() => {
   try { ok = CSS.supports('backdrop-filter', 'url(#x) blur(1px)'); } catch {}
   return chromium && ok;
 })();
+if (refractionSupported) document.documentElement.classList.add('blink'); // see glass.css
 
 function svgDefs() {
   if (defs) return defs;
@@ -148,11 +149,14 @@ export function setGlassMode(m) {
 
 // ---------------------------------------------------------------- light / tilt
 const tiltEls = document.getElementsByClassName('tilt'); // live collection
-let tx = 0, ty = 0, cx = 0, cy = 0, running = false, lightOn = true;
+let tx = 0, ty = 0, cx = 0, cy = 0, running = false, lightOn = true, lastT = 0;
 
-function paint() {
-  cx += (tx - cx) * 0.1;
-  cy += (ty - cy) * 0.1;
+function paint(now) {
+  // Same glide at 60, 90 or 120 Hz: 10% of the way per 60 Hz frame, scaled by elapsed time.
+  const k = 1 - Math.pow(0.9, clamp((now - lastT) / (1000 / 60), 0, 4));
+  lastT = now;
+  cx += (tx - cx) * k;
+  cy += (ty - cy) * k;
   const x = cx.toFixed(3), y = cy.toFixed(3);
   for (let i = 0; i < tiltEls.length; i++) {
     const s = tiltEls[i].style;
@@ -163,6 +167,13 @@ function paint() {
   else running = false;
 }
 
+function start() {
+  if (running) return;
+  running = true;
+  lastT = performance.now();
+  requestAnimationFrame(paint);
+}
+
 function aim(x, y) {
   if (!lightOn) return;
   x = clamp(x, -1, 1);
@@ -170,12 +181,12 @@ function aim(x, y) {
   if (Math.abs(x - tx) < 0.025 && Math.abs(y - ty) < 0.025) return; // dead-band against sensor jitter
   tx = x;
   ty = y;
-  if (!running) { running = true; requestAnimationFrame(paint); }
+  start();
 }
 
 export function setLight(on) {
   lightOn = on;
-  if (!on) { tx = ty = 0; if (!running) { running = true; requestAnimationFrame(paint); } }
+  if (!on) { tx = ty = 0; start(); }
 }
 
 export function initLight() {

@@ -450,12 +450,11 @@
 }
 .onb h1 { font: 800 38px/1.05 var(--font-display); letter-spacing: -.035em; }
 .onb h1 .grad {
-  background: linear-gradient(100deg, #cfe3c4, #85bb65 45%, #a7c88a 90%);
+  background: var(--title-grad);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-[data-theme="light"] .onb h1 .grad { background: linear-gradient(100deg, #123524, #2e7d4f 50%, #3e6b5c 95%); -webkit-background-clip: text; background-clip: text; }
 .onb h2 { font: 800 30px/1.1 var(--font-display); letter-spacing: -.028em; }
 .onb .lead { margin-top: 12px; font: 400 17px/1.45 var(--font-text); color: var(--t2); }
 .onb-actions { display: grid; gap: 10px; margin-top: 26px; }

@@ -2,7 +2,7 @@
 
 A tiny, private, offline expense tracker with an iOS 26–style **Liquid Glass** interface, in the colours of the US dollar.
 You can track income and spending across **Cash, GPay/UPI and credit cards**, and your
-balance stays correct: card bills never double-count your spending.
+balance stays correct: credit cards are tracked separately against their limit, so card spends never eat into your Cash or GPay balance.
 
 | | |
 |---|---|
@@ -21,7 +21,7 @@ balance stays correct: card bills never double-count your spending.
     <td align="center" width="33%"><img src="docs/screenshots/activity-light.jpg" width="240" alt="Activity list"></td>
   </tr>
   <tr>
-    <td valign="top"><b>Home.</b> Your total balance is Cash + GPay − what you owe on cards. Below it: this month's income and spending, how much of the budget is left per day, upcoming recurring payments and card bills with a one-tap <i>Pay</i>.</td>
+    <td valign="top"><b>Home.</b> Your total balance is Cash + GPay (cards are tracked separately, with how much limit is left). Below it: this month's income and spending, how much of the budget is left per day, upcoming recurring payments and card bills with a one-tap <i>Pay</i>.</td>
     <td valign="top"><b>Add.</b> Tap <b>+</b>, type the amount on the calculator keypad (sums like <code>120+45</code> work), pick how you paid and a category, then tick. Your most-used categories come first.</td>
     <td valign="top"><b>Activity.</b> Every transaction, grouped by day with daily totals. Search by note, category or amount, and filter by expenses, income or transfers. Tap a row to edit it, or swipe it to delete.</td>
   </tr>
@@ -33,7 +33,7 @@ balance stays correct: card bills never double-count your spending.
   <tr>
     <td valign="top"><b>Insights.</b> The month at a glance (income, spent, net, % saved) and plain-English highlights, like "Weekends cost you 2.5× more per day".</td>
     <td valign="top"><b>Spending by category.</b> A donut chart plus a bar for each category. Bars turn red when you go over that category's budget.</td>
-    <td valign="top"><b>Wallet.</b> Net worth split into what you have and what you owe. Cash and UPI accounts sit on top, and your credit cards are stacked like Apple Wallet. Tap any of them to see its ledger.</td>
+    <td valign="top"><b>Wallet.</b> Your balance, plus total card dues and card limit left. Cash and UPI accounts sit on top, and your credit cards are stacked like Apple Wallet. Tap any of them to see its ledger.</td>
   </tr>
 </table>
 
@@ -52,9 +52,9 @@ The screenshots show the built-in sample data. To try it yourself, choose **Expl
 
 ## Features
 
-- **Balance that behaves like real money:** Cash + GPay/bank − credit-card dues.
-  - A card spend lowers your balance immediately.
-  - Paying the card bill is a *transfer*, so it isn't counted as spending twice.
+- **Balance that behaves like real money:** Cash + GPay/bank only.
+  - A card spend doesn't touch your balance; it only uses up that card's limit.
+  - Paying the card bill is a *transfer* out of your balance, so it isn't counted as spending twice.
   - ATM withdrawals and cash deposits are transfers too.
 - **Two-tap logging:**
   - A calculator keypad (`120+45−10`) with categories sorted by how often you use them.

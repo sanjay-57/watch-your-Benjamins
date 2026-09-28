@@ -1,0 +1,258 @@
+/* ==========================================================================
+   Banknotes — alternate looks, picked in Settings → Appearance → Banknote.
+   The default (no override) is the US dollar in tokens.css. Each note below
+   re-inks the same tokens for dark + light, its four accent slots, and the
+   solid-glass material. Selectors are always [data-theme][data-note] so they
+   outrank the single-attribute rules in tokens.css regardless of order.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- UAE dirham
+     Gulf blue of the polymer notes · Arabian-sea turquoise · desert gold
+     dune sand · pearl paper · falcon bronze · the rose of the 100-dirham note */
+[data-theme="dark"][data-note="dirham"] {
+  --bg: #06121a;
+  --bg-elev: #0c1c27;
+  --bg-rgb: 6 18 26;
+  --night-rgb: 6 18 26;
+  --present-bg: #02070b;
+  --t1: #f3eee2;
+  --t2: rgba(236, 230, 214, .70);
+  --t3: rgba(236, 230, 214, .54);
+  --t4: rgba(236, 230, 214, .24);
+  --sep: rgba(200, 225, 235, .10);
+  --fill-1: rgba(128, 160, 182, .26);
+  --fill-2: rgba(128, 160, 182, .17);
+  --fill-3: rgba(128, 160, 182, .10);
+  --on-color: #061520;
+
+  --pos: #7fd3b8;
+  --pos-rgb: 127 211 184;
+  --neg: #ec8a8c;
+  --neg-rgb: 236 138 140;
+  --warn: #e3c178;
+  --warn-rgb: 227 193 120;
+  --xfer: #8fc0e0;
+  --xfer-rgb: 143 192 224;
+  --spend: #d8bf8a;
+  --spend-rgb: 216 191 138;
+  --m-cash: #5fc0cf;
+  --m-cash-rgb: 95 192 207;
+  --m-upi: #8fb0e6;
+  --m-upi-rgb: 143 176 230;
+  --m-card: #d4b26a;
+  --m-card-rgb: 212 178 106;
+
+  --g-tint: rgba(14, 32, 46, .34);
+  --g-tint-strong: rgba(9, 24, 36, .66);
+  --g-tint-thick: rgba(7, 19, 29, .86);
+
+  --au1: 31 95 134;
+  --au2: 79 179 196;
+  --au3: 28 60 96;
+  --au4: 150 118 62;
+
+  --engrave: rgba(200, 225, 235, .14);
+  --ring-bg: #0d1e2a;
+  --row-solid: #0c1c27;
+  --title-grad: linear-gradient(100deg, #cfe4ea, #4fb3c4 45%, #e6d3a8 90%);
+
+  --accent-rgb: 111 176 214; --accent-2-rgb: 31 95 134;
+}
+[data-theme="light"][data-note="dirham"] {
+  --bg: #f4efe3;
+  --bg-elev: #fcfaf4;
+  --bg-rgb: 244 239 227;
+  --night-rgb: 6 18 26;
+  --present-bg: #02070b;
+  --t1: #0e1a24;
+  --t2: rgba(26, 44, 60, .74);
+  --t3: rgba(26, 44, 60, .58);
+  --t4: rgba(26, 44, 60, .24);
+  --sep: rgba(31, 95, 134, .12);
+  --fill-1: rgba(90, 118, 140, .17);
+  --fill-2: rgba(90, 118, 140, .11);
+  --fill-3: rgba(90, 118, 140, .07);
+  --on-color: #f7f4ea;
+
+  --pos: #1d7a5f;
+  --pos-rgb: 29 122 95;
+  --neg: #b8324a;
+  --neg-rgb: 184 50 74;
+  --warn: #8a6a1e;
+  --warn-rgb: 138 106 30;
+  --xfer: #1f5f86;
+  --xfer-rgb: 31 95 134;
+  --spend: #8a6d34;
+  --spend-rgb: 138 109 52;
+  --m-cash: #1f7f8f;
+  --m-cash-rgb: 31 127 143;
+  --m-upi: #2d5f9a;
+  --m-upi-rgb: 45 95 154;
+  --m-card: #9a7a36;
+  --m-card-rgb: 154 122 54;
+
+  --shade-rgb: 20 50 75;
+  --g-shadow: 0 1px 2px rgb(var(--shade-rgb) / .07), 0 16px 40px -18px rgb(var(--shade-rgb) / .28);
+  --g-shadow-lg: 0 2px 6px rgb(var(--shade-rgb) / .08), 0 30px 70px -20px rgb(var(--shade-rgb) / .34);
+
+  --au1: 200 228 232;
+  --au2: 233 219 186;
+  --au3: 205 222 238;
+  --au4: 236 230 214;
+
+  --scrim: rgba(8, 24, 38, .24);
+  --engrave: rgba(31, 95, 134, .16);
+  --ring-bg: #f6f2e8;
+  --row-solid: #fcfaf4;
+  --title-grad: linear-gradient(100deg, #0b2a3a, #1f5f86 50%, #9a7a36 95%);
+
+  --accent-rgb: 31 95 134; --accent-2-rgb: 26 122 138;
+}
+/* accent slots: gulf · turquoise · gold · rose */
+[data-theme="dark"][data-note="dirham"][data-accent="seal"] { --accent-rgb: 95 196 206; --accent-2-rgb: 26 122 138; }
+[data-theme="dark"][data-note="dirham"][data-accent="jade"] { --accent-rgb: 218 186 116; --accent-2-rgb: 138 106 40; }
+[data-theme="dark"][data-note="dirham"][data-accent="khaki"] { --accent-rgb: 226 140 150; --accent-2-rgb: 168 60 82; }
+[data-theme="light"][data-note="dirham"][data-accent="seal"] { --accent-rgb: 26 122 138; --accent-2-rgb: 31 95 134; }
+[data-theme="light"][data-note="dirham"][data-accent="jade"] { --accent-rgb: 138 106 40; --accent-2-rgb: 154 122 54; }
+[data-theme="light"][data-note="dirham"][data-accent="khaki"] { --accent-rgb: 168 60 82; --accent-2-rgb: 184 50 74; }
+[data-theme="dark"][data-note="dirham"][data-glass="solid"] {
+  --g-tint: rgba(14, 30, 42, .95);
+  --g-tint-strong: rgba(11, 25, 36, .97);
+  --g-tint-thick: rgba(9, 21, 31, .98);
+}
+
+/* ---------------------------------------------------------------- Indian ₹500
+     Mahatma Gandhi New Series: stone-grey base · the green → blue colour-shift
+     of the security thread and numeral · Red Fort sandstone · saffron tint */
+[data-theme="dark"][data-note="rupee"] {
+  --bg: #111210;
+  --bg-elev: #1a1b18;
+  --bg-rgb: 17 18 16;
+  --night-rgb: 17 18 16;
+  --present-bg: #060605;
+  --t1: #efede6;
+  --t2: rgba(232, 229, 220, .70);
+  --t3: rgba(232, 229, 220, .54);
+  --t4: rgba(232, 229, 220, .24);
+  --sep: rgba(230, 226, 215, .10);
+  --fill-1: rgba(150, 146, 135, .24);
+  --fill-2: rgba(150, 146, 135, .16);
+  --fill-3: rgba(150, 146, 135, .09);
+  --on-color: #12130f;
+
+  --pos: #7ccfa5;
+  --pos-rgb: 124 207 165;
+  --neg: #e98a7a;
+  --neg-rgb: 233 138 122;
+  --warn: #e2b35e;
+  --warn-rgb: 226 179 94;
+  --xfer: #86b1e0;
+  --xfer-rgb: 134 177 224;
+  --spend: #c9b99a;
+  --spend-rgb: 201 185 154;
+  --m-cash: #b9b3a4;
+  --m-cash-rgb: 185 179 164;
+  --m-upi: #6fc2c0;
+  --m-upi-rgb: 111 194 192;
+  --m-card: #d9a24a;
+  --m-card-rgb: 217 162 74;
+
+  --g-tint: rgba(34, 34, 30, .34);
+  --g-tint-strong: rgba(24, 24, 21, .66);
+  --g-tint-thick: rgba(19, 19, 17, .86);
+
+  --au1: 96 92 84;
+  --au2: 40 120 96;
+  --au3: 44 86 132;
+  --au4: 128 78 58;
+
+  --engrave: rgba(230, 226, 215, .13);
+  --ring-bg: #1c1d1a;
+  --row-solid: #1a1b18;
+  --title-grad: linear-gradient(100deg, #dcd8ce, #7ccfa5 45%, #86b1e0 90%);
+
+  --accent-rgb: 124 207 165; --accent-2-rgb: 31 122 85;
+}
+[data-theme="light"][data-note="rupee"] {
+  --bg: #eceae3;
+  --bg-elev: #f9f8f4;
+  --bg-rgb: 236 234 227;
+  --night-rgb: 17 18 16;
+  --present-bg: #060605;
+  --t1: #161614;
+  --t2: rgba(40, 40, 36, .74);
+  --t3: rgba(40, 40, 36, .58);
+  --t4: rgba(40, 40, 36, .24);
+  --sep: rgba(80, 76, 66, .13);
+  --fill-1: rgba(110, 106, 96, .16);
+  --fill-2: rgba(110, 106, 96, .10);
+  --fill-3: rgba(110, 106, 96, .06);
+  --on-color: #f7f6f1;
+
+  --pos: #1f7a55;
+  --pos-rgb: 31 122 85;
+  --neg: #b33a2e;
+  --neg-rgb: 179 58 46;
+  --warn: #8f6516;
+  --warn-rgb: 143 101 22;
+  --xfer: #2e64a0;
+  --xfer-rgb: 46 100 160;
+  --spend: #7a6a4a;
+  --spend-rgb: 122 106 74;
+  --m-cash: #6b665a;
+  --m-cash-rgb: 107 102 90;
+  --m-upi: #1f7a78;
+  --m-upi-rgb: 31 122 120;
+  --m-card: #a36f1c;
+  --m-card-rgb: 163 111 28;
+
+  --shade-rgb: 45 42 34;
+  --g-shadow: 0 1px 2px rgb(var(--shade-rgb) / .07), 0 16px 40px -18px rgb(var(--shade-rgb) / .28);
+  --g-shadow-lg: 0 2px 6px rgb(var(--shade-rgb) / .08), 0 30px 70px -20px rgb(var(--shade-rgb) / .34);
+
+  --au1: 222 219 210;
+  --au2: 196 226 210;
+  --au3: 200 216 236;
+  --au4: 236 214 200;
+
+  --scrim: rgba(20, 20, 16, .24);
+  --engrave: rgba(80, 76, 66, .17);
+  --ring-bg: #f1efe9;
+  --row-solid: #f9f8f4;
+  --title-grad: linear-gradient(100deg, #2b2a26, #1f7a55 50%, #2e64a0 95%);
+
+  --accent-rgb: 31 122 85; --accent-2-rgb: 46 100 160;
+}
+/* accent slots: shift-green · shift-blue · Red Fort · saffron */
+[data-theme="dark"][data-note="rupee"][data-accent="seal"] { --accent-rgb: 134 177 224; --accent-2-rgb: 46 100 160; }
+[data-theme="dark"][data-note="rupee"][data-accent="jade"] { --accent-rgb: 222 140 110; --accent-2-rgb: 160 72 48; }
+[data-theme="dark"][data-note="rupee"][data-accent="khaki"] { --accent-rgb: 226 180 94; --accent-2-rgb: 143 101 22; }
+[data-theme="light"][data-note="rupee"][data-accent="seal"] { --accent-rgb: 46 100 160; --accent-2-rgb: 31 122 85; }
+[data-theme="light"][data-note="rupee"][data-accent="jade"] { --accent-rgb: 160 72 48; --accent-2-rgb: 181 101 74; }
+[data-theme="light"][data-note="rupee"][data-accent="khaki"] { --accent-rgb: 143 101 22; --accent-2-rgb: 163 111 28; }
+[data-theme="dark"][data-note="rupee"][data-glass="solid"] {
+  --g-tint: rgba(30, 30, 27, .95);
+  --g-tint-strong: rgba(25, 25, 22, .97);
+  --g-tint-thick: rgba(21, 21, 19, .98);
+}
+
+/* ---------------------------------------------------------------- picker (Settings) */
+.note-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; padding-top: 10px; }
+.note-pick button { display: grid; gap: 6px; justify-items: center; font: 600 12px var(--font-text); color: var(--t2); }
+.note-pick button[aria-pressed="true"] { color: var(--t1); }
+.note-pick .bill {
+  width: 100%;
+  aspect-ratio: 2.1;
+  border-radius: 8px;
+  display: grid;
+  place-items: center end;
+  padding-right: 9px;
+  font: 800 15px/1 var(--font-display);
+  letter-spacing: -.01em;
+  color: var(--n-ink);
+  background: var(--guilloche-card) right -40px center / 110px 110px no-repeat, var(--n-bg);
+  box-shadow: inset 0 0 0 .5px rgba(255, 255, 250, .3), 0 4px 12px -6px rgba(0, 0, 0, .5);
+  transition: transform .45s var(--ease-spring), box-shadow .2s var(--ease-out);
+}
+.note-pick button[aria-pressed="true"] .bill { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 6px 16px -6px rgba(0, 0, 0, .5); }
+.note-pick button:active .bill { transform: scale(.94); }

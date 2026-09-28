@@ -150,16 +150,18 @@ export function renderHome(root) {
           <button class="hero-label" data-act="explain">${icon('wallet', 'sm')}<span>Total balance</span>${icon('info', 'xs')}</button>
           ${s.demo ? '<span class="badge" style="--c:var(--warn-rgb)">Sample data</span>' : ''}
         </div>
-        <div class="hero-amount amt num ${T.net < 0 ? 'neg' : ''}" id="hero-amt"></div>
+        <div class="hero-amount amt num ${T.balance < 0 ? 'neg' : ''}" id="hero-amt"></div>
         <div class="hero-delta">
           <span class="badge amt" style="--c:${ms.net >= 0 ? 'var(--pos-rgb)' : 'var(--neg-rgb)'}">${icon(ms.net >= 0 ? 'trend-up' : 'trend-down')}${esc(money(ms.net, { sign: 'always' }))}</span>
           <span class="t-foot t2">net this month</span>
         </div>
-        <div class="hero-spark">${sparkArea(series, { color: T.net < 0 ? 'var(--neg)' : 'var(--accent)' })}</div>
+        <div class="hero-spark">${sparkArea(series, { color: T.balance < 0 ? 'var(--neg)' : 'var(--accent)' })}</div>
         <div class="hero-split">
           <button data-act="acct-type" data-type="cash" style="--c:var(--m-cash-rgb)"><span class="k"><i></i>Cash</span><span class="v amt ellip" style="display:block">${esc(money(T.cash))}</span></button>
           <button data-act="acct-type" data-type="upi" style="--c:var(--m-upi-rgb)"><span class="k ellip"><i></i>${esc(upiLabel)}</span><span class="v amt ellip" style="display:block">${esc(money(T.upi))}</span></button>
-          <button data-act="acct-type" data-type="card" style="--c:var(--m-card-rgb)"><span class="k"><i></i>Card dues</span><span class="v amt ellip" style="display:block">${esc(T.cardDue ? money(-T.cardDue) : money(0))}</span></button>
+          <button data-act="acct-type" data-type="card" style="--c:var(--m-card-rgb)">${T.limit
+            ? `<span class="k ellip"><i></i>Card limit left</span><span class="v amt ellip ${T.cardAvail < 0 ? 'neg' : ''}" style="display:block">${esc(money(T.cardAvail))}</span>`
+            : `<span class="k"><i></i>Card dues</span><span class="v amt ellip" style="display:block">${esc(money(T.cardDue))}</span>`}</button>
         </div>
       </section>
 
@@ -184,5 +186,5 @@ export function renderHome(root) {
   </div>
   <div class="topbar"><div class="topbar-title">Home</div></div>`;
 
-  odometer($('#hero-amt', root), money(T.net), 'hero');
+  odometer($('#hero-amt', root), money(T.balance), 'hero');
 }

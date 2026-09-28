@@ -12,9 +12,7 @@ import { icon } from '../ui/icons.js';
 import { openCurrencyPicker, openCategoriesManager, openBudgetSheet, openRecurringManager } from './manage.js';
 import { openPresetManager } from './presets.js';
 import { setupLock, disableLock } from './lock.js';
-
-// accent swatches — dollar inks (bright for dark mode, deep for light mode)
-const ACCENTS = [['greenback', '133 187 101', '31 90 58'], ['seal', '111 196 132', '46 125 79'], ['jade', '127 196 174', '47 111 94'], ['khaki', '215 199 138', '124 111 54']];
+import { NOTES, currentNote } from '../ui/notes.js';
 
 const seg = (name, value, opts) => `<div class="seg" data-seg="${name}" style="height:36px;min-width:200px">
   <span class="seg-thumb"></span>${opts.map(([k, l]) => `<button data-v="${k}" aria-pressed="${value === k}">${l}</button>`).join('')}</div>`;
@@ -71,9 +69,11 @@ export function openSettings({ onThemeChange, restartOnboarding } = {}) {
 
       <div class="caps" style="padding:22px 6px 8px">Appearance</div>
       <div class="glass group">
+        <div class="cell" style="flex-wrap:wrap"><span class="cell-icon" style="--c:var(--m-card-rgb)">${icon('wallet')}</span><span class="label">Banknote<small>Colours printed from a real note</small></span>
+          <div class="note-pick">${Object.entries(NOTES).map(([k, n]) => `<button class="press" data-note="${k}" aria-label="${esc(n.name)} theme" aria-pressed="${(NOTES[s.note] ? s.note : 'dollar') === k}"><span class="bill" style="--n-bg:${n.bg};--n-ink:${n.ink}">${esc(n.face)}</span>${esc(n.name)}</button>`).join('')}</div></div>
         <div class="cell"><span class="cell-icon" style="--c:var(--xfer-rgb)">${icon('moon')}</span><span class="label">Theme</span>${seg('theme', s.theme, [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']])}</div>
         <div class="cell"><span class="cell-icon" style="--c:var(--accent-rgb)">${icon('palette')}</span><span class="label">Accent</span>
-          <div class="swatches">${ACCENTS.map(([k, dk, lt]) => `<button class="swatch" data-acc="${k}" aria-label="${k}" aria-pressed="${(ACCENTS.some(x => x[0] === s.accent) ? s.accent : 'greenback') === k}" style="--c:${document.documentElement.dataset.theme === 'light' ? lt : dk}"></button>`).join('')}</div></div>
+          <div class="swatches">${currentNote().accents.map(([k, nm, dk, lt]) => `<button class="swatch" data-acc="${k}" aria-label="${nm}" aria-pressed="${(currentNote().accents.some(x => x[0] === s.accent) ? s.accent : 'greenback') === k}" style="--c:${document.documentElement.dataset.theme === 'light' ? lt : dk}"></button>`).join('')}</div></div>
         <div class="cell" style="flex-wrap:wrap"><span class="cell-icon" style="--c:var(--m-upi-rgb)">${icon('droplet')}</span><span class="label">Glass</span>${seg('glass', s.glass, [['liquid', 'Liquid'], ['frosted', 'Frosted'], ['solid', 'Solid']])}</div>
         <div class="cell"><span class="cell-icon" style="--c:var(--warn-rgb)">${icon('zap')}</span><span class="label">Reduce motion<small>Calmer animations, static background</small></span>${sw('motion', s.motion === 'reduced')}</div>
       </div>
@@ -122,6 +122,14 @@ export function openSettings({ onThemeChange, restartOnboarding } = {}) {
       haptic('selection');
       if (name === 'theme') onThemeChange?.(() => setSettings({ theme: v }), e.clientX, e.clientY);
       else if (name === 'glass') setSettings({ glass: v });
+      return;
+    }
+    const note = e.target.closest('.note-pick [data-note]');
+    if (note) {
+      if (note.dataset.note === store.settings.note) return;
+      body.querySelectorAll('.note-pick [data-note]').forEach(b => b.setAttribute('aria-pressed', b === note));
+      haptic('selection');
+      onThemeChange?.(() => setSettings({ note: note.dataset.note }), e.clientX, e.clientY);
       return;
     }
     const acc = e.target.closest('[data-acc]');

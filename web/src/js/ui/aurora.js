@@ -55,20 +55,35 @@ function size(a) {
   a.h = a.canvas.height = Math.max(48, Math.round(H / 5));
 }
 
-let raf = 0, last = 0;
+// Driven by a 25 fps timer, not a rAF loop: a slow drift needs no more, and a permanent rAF
+// would wake the renderer on every vsync of a 90/120 Hz panel. Every repaint also makes each
+// glass surface above re-filter its backdrop, so the drift freezes while anything is held —
+// a finger on the screen, a scroll, an open sheet — and interaction frames stay light.
+const holds = new Set();
+let timer = 0;
 const t0 = performance.now() - 12000;
-function loop(now) {
-  raf = 0;
-  if (document.hidden) return;
-  if (now - last >= 40) { // ~25 fps is plenty for a slow drift
-    last = now;
-    for (const a of all) if (!a.host.classList.contains('paused') && a.host.isConnected && a.host.offsetParent !== null) draw(a, (now - t0) / 1000);
+function tick() {
+  timer = 0;
+  if (document.hidden || reducedMotion()) return;
+  if (!holds.size) {
+    const t = (performance.now() - t0) / 1000;
+    for (const a of all) if (a.host.isConnected && a.host.offsetParent !== null) draw(a, t);
   }
-  if (!reducedMotion()) raf = requestAnimationFrame(loop);
+  timer = setTimeout(tick, 40);
 }
 
 function kick() {
-  if (!raf && !reducedMotion()) raf = requestAnimationFrame(loop);
+  if (!timer && !reducedMotion()) timer = setTimeout(tick, 40);
+}
+
+const releases = new Map(); // key → pending delayed release
+/** Freeze (on) / resume (off) the drift for `key`; `delay` ms before a resume takes effect. */
+export function holdAurora(key, on, delay = 0) {
+  clearTimeout(releases.get(key));
+  releases.delete(key);
+  if (on) holds.add(key);
+  else if (!delay) holds.delete(key);
+  else releases.set(key, setTimeout(() => { releases.delete(key); holds.delete(key); }, delay));
 }
 
 /** Mount an animated aurora canvas inside `host` (an .aurora element). Returns an unmount fn. */
@@ -97,3 +112,5 @@ export function refreshAurora() {
 
 addEventListener('resize', () => { for (const a of all) { size(a); } refreshAurora(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
+addEventListener('pointerdown', () => holdAurora('touch', true), { capture: true, passive: true });
+for (const t of ['pointerup', 'pointercancel']) addEventListener(t, () => holdAurora('touch', false, 250), { capture: true, passive: true });

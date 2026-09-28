@@ -6,6 +6,7 @@ import { haptic } from '../core/native.js';
 import { icon } from '../ui/icons.js';
 import { donut, bars, pairBars } from '../ui/charts.js';
 import { catRGB, METHOD, txRow, emptyState, acctRGB } from './common.js';
+import { noteInk } from '../ui/notes.js';
 
 export const IS = { mk: thisMonth() };
 
@@ -77,8 +78,8 @@ export function renderInsights(root) {
   const cats = [...ms.byCat.entries()].sort((a, b) => b[1] - a[1]);
   const topN = cats.slice(0, 5);
   const rest = cats.slice(5).reduce((s, [, v]) => s + v, 0);
-  const segs = topN.map(([id, v]) => { const c = category(id); return { value: v, color: c?.color || '#7E8A80', label: c?.name, id }; });
-  if (rest) segs.push({ value: rest, color: '#7E8A80', label: 'Other', id: null });
+  const segs = topN.map(([id, v]) => { const c = category(id); return { value: v, color: noteInk(c?.color || '#7E8A80'), label: c?.name, id }; });
+  if (rest) segs.push({ value: rest, color: noteInk('#7E8A80'), label: 'Other', id: null });
 
   // methods
   const acctRows = [...ms.byAcct.entries()].sort((a, b) => b[1] - a[1]);

@@ -22,11 +22,10 @@ function rosette(stroke, size = 320) {
 }
 
 const cache = {};
-/** Set --guilloche (theme ink) and --guilloche-card (cream, for dark cards) on :root. */
-export function applyEngraving(theme) {
-  const ink = theme === 'light' ? 'rgba(31,90,58,0.16)' : 'rgba(207,227,196,0.14)';
-  const key = theme;
-  cache[key] ||= rosette(ink);
+/** Set --guilloche (the note's --engrave ink) and --guilloche-card (cream, for dark cards) on :root. */
+export function applyEngraving() {
+  const key = getComputedStyle(document.documentElement).getPropertyValue('--engrave').trim() || 'rgba(207,227,196,0.14)';
+  cache[key] ||= rosette(key);
   cache.card ||= rosette('rgba(247,245,234,0.2)');
   cache.cardDark ||= rosette('rgba(15,26,19,0.18)');
   const s = document.documentElement.style;

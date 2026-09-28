@@ -3,9 +3,11 @@
 // Accounting model
 //  • Every account has a signed balance = opening + inflows − outflows.
 //  • Cash / UPI / bank balances are money you HAVE (positive).
-//  • Credit cards go NEGATIVE as you spend (what you OWE); paying the bill is a
-//    transfer bank → card, so it's never double-counted as an expense.
-//  • Net balance = Σ all balances  (cash + GPay/bank − card dues).
+//  • Credit cards go NEGATIVE as you spend (what you OWE) and are tracked on their
+//    own against the card limit; paying the bill is a transfer bank → card, so it's
+//    never double-counted as an expense.
+//  • Balance = cash + GPay/bank only. Card spends don't touch it; money leaves it
+//    only when you actually pay the card bill.
 import * as db from './db.js';
 import { uid, debounce } from './util.js';
 import { CURRENCIES, localPrice } from './money.js';
@@ -49,8 +51,13 @@ export const CARD_THEMES = {
   khaki: ['#cdbf86', '#6e7b4e', '#e3dfcb'],
   paper: ['#f2f0e6', '#cdbf86', '#e3dfcb'],
   mint: ['#cfe3c4', '#85bb65', '#f2f0e6'],
+  // dirham & ₹500 inks
+  gulf: ['#2f7fa8', '#0b2a3a', '#4fb3c4'],
+  dune: ['#e6d3a8', '#c09a55', '#f4efe3'],
+  stone: ['#8f8b80', '#2b2a26', '#3fae85'],
+  fort: ['#b5654a', '#3a1f16', '#d9a24a'],
 };
-export const LIGHT_CARDS = new Set(['paper', 'mint', 'khaki']);
+export const LIGHT_CARDS = new Set(['paper', 'mint', 'khaki', 'dune']);
 const LEGACY_CARD = { aurora: 'greenback', sunset: 'khaki', ocean: 'jade', forest: 'seal', midnight: 'ink', rose: 'olive', gold: 'paper', graphite: 'ink' };
 // every colour a category may use (all from the dollar)
 export const DOLLAR_COLORS = ['#85BB65', '#A7C88A', '#CDBF86', '#5FA38F', '#8FBFAE', '#2E7D4F', '#B8A86A', '#6FB08A', '#3E6B5C', '#9FD47C', '#7E9C6E', '#8FA886', '#CFE3C4', '#D8CFA3', '#6E7B4E', '#7E8A80'];
@@ -73,6 +80,7 @@ const DEFAULT_SETTINGS = {
   currency: 'INR',
   theme: 'system',
   accent: 'greenback',
+  note: 'dollar',
   glass: 'liquid',
   motion: 'full',
   haptics: true,
@@ -215,6 +223,7 @@ function normSettings(s) {
     currency: pickOne(s.currency, CUR_CODES, 'INR'),
     theme: pickOne(s.theme, ['system', 'light', 'dark'], d.theme),
     accent: pickOne(s.accent, ['greenback', 'seal', 'jade', 'khaki'], d.accent),
+    note: pickOne(s.note, ['dollar', 'dirham', 'rupee'], d.note),
     glass: pickOne(s.glass, ['liquid', 'frosted', 'solid'], d.glass),
     motion: pickOne(s.motion, ['full', 'reduced'], d.motion),
     haptics: s.haptics !== false,
@@ -532,7 +541,7 @@ export function changeCurrency(code, fromDecimals, toDecimals) {
 
 export function syncUIPrefs() {
   const s = S.settings;
-  db.writeUI({ theme: s.theme, accent: s.accent, glass: s.glass, motion: s.motion, hide: !!s.hideOnLaunch });
+  db.writeUI({ theme: s.theme, accent: s.accent, note: s.note, glass: s.glass, motion: s.motion, hide: !!s.hideOnLaunch });
 }
 
 // accounts
@@ -653,7 +662,7 @@ export function replaceAll(data, { keepSettings = false } = {}) {
   commit({ all: true });
   syncUIPrefs();
 }
-const pickUI = s => ({ theme: s.theme, accent: s.accent, glass: s.glass, motion: s.motion, haptics: s.haptics });
+const pickUI = s => ({ theme: s.theme, accent: s.accent, note: s.note, glass: s.glass, motion: s.motion, haptics: s.haptics });
 
 export async function eraseAll() {
   const ui = pickUI(S.settings);
@@ -716,15 +725,19 @@ export const balances = memo(() => {
 
 export const totals = memo(() => {
   const b = balances();
-  let cash = 0, upi = 0, cardDue = 0, cardCredit = 0, limit = 0;
+  let cash = 0, upi = 0, cardDue = 0, cardCredit = 0, limit = 0, cardAvail = 0;
   for (const a of S.accounts) {
     const v = b.get(a.id) || 0;
-    if (a.type === 'card') { if (v < 0) cardDue -= v; else cardCredit += v; if (!a.archived) limit += a.limit || 0; }
+    if (a.type === 'card') {
+      if (v < 0) cardDue -= v; else cardCredit += v;
+      if (!a.archived && a.limit) { limit += a.limit; cardAvail += a.limit + v; }
+    }
     else if (a.type === 'cash') cash += v;
     else upi += v;
   }
   const liquid = cash + upi;
-  return { cash, upi, liquid, cardDue, cardCredit, limit, net: liquid + cardCredit - cardDue };
+  // Cards are kept separate: the balance is only the money you actually have.
+  return { cash, upi, liquid, cardDue, cardCredit, limit, cardAvail, balance: liquid };
 });
 
 const monthIndex = memo(() => {
@@ -770,12 +783,19 @@ export const monthStats = memo(mk => {
   return r;
 });
 
-/** Net balance at the end of each of the last `days` days (for the sparkline). */
+/** Balance (cash + GPay/bank) at the end of each of the last `days` days (for the sparkline). */
 export const balanceSeries = memo(days => {
   const today = todayKey();
   const start = addDays(today, -(days - 1));
-  const effect = t => (t.type === 'income' ? t.amount : t.type === 'expense' ? -t.amount : t.type === 'adjust' ? t.amount : 0);
-  let bal = totals().net;
+  const cards = new Set(S.accounts.filter(a => a.type === 'card').map(a => a.id));
+  const on = id => (id && !cards.has(id) ? 1 : 0);
+  const effect = t => {
+    if (t.type === 'income' || t.type === 'adjust') return on(t.accountId) * t.amount;
+    if (t.type === 'expense') return -on(t.accountId) * t.amount;
+    if (t.type === 'transfer') return (on(t.toAccountId) - on(t.accountId)) * t.amount;
+    return 0;
+  };
+  let bal = totals().balance;
   const perDay = new Map();
   for (const t of S.txs) {
     if (t.date > today) { bal -= effect(t); continue; }

@@ -10,7 +10,7 @@ import { installEasings, SPR, animate } from './ui/spring.js';
 import { initSheets, onPresentationChange } from './ui/sheet.js';
 import { initTabbar, setActiveTab } from './ui/tabbar.js';
 import { setGlassMode, initLight, setLight } from './ui/glass.js';
-import { mountAurora, refreshAurora } from './ui/aurora.js';
+import { mountAurora, refreshAurora, holdAurora } from './ui/aurora.js';
 import { applyEngraving } from './ui/engrave.js';
 import { attachSwipe, closeOpenRow } from './ui/swipe.js';
 import { toast, alertDialog, openMenu } from './ui/overlays.js';
@@ -40,13 +40,15 @@ let onboarding = null;
 const systemDark = () => (nativeDark != null ? nativeDark : matchMedia('(prefers-color-scheme: dark)').matches);
 
 const ACCENTS = ['greenback', 'seal', 'jade', 'khaki'];
+const NOTES = ['dollar', 'dirham', 'rupee'];
 let presenting = 0;
 let lastLook = '';
 function syncBars() {
   // while a sheet is up the page sits on a black frame → light status-bar icons
   const theme = root.dataset.theme;
-  if (presenting) native.setTheme('dark', '#030805');
-  else native.setTheme(theme, theme === 'dark' ? '#07120c' : '#f2f0e6');
+  const cs = getComputedStyle(root);
+  if (presenting) native.setTheme('dark', cs.getPropertyValue('--present-bg').trim() || '#030805');
+  else native.setTheme(theme, cs.getPropertyValue('--bg').trim() || (theme === 'dark' ? '#07120c' : '#f2f0e6'));
 }
 
 function applySettings() {
@@ -55,10 +57,11 @@ function applySettings() {
   const theme = s.theme === 'system' ? (systemDark() ? 'dark' : 'light') : s.theme;
   if (root.dataset.theme !== theme) root.dataset.theme = theme;
   root.dataset.accent = ACCENTS.includes(s.accent) ? s.accent : 'greenback';
+  root.dataset.note = NOTES.includes(s.note) ? s.note : 'dollar';
   root.dataset.glass = s.glass;
   root.dataset.motion = s.motion;
-  const look = theme + s.glass + s.motion;
-  if (look !== lastLook) { lastLook = look; refreshAurora(); applyEngraving(theme); }
+  const look = theme + root.dataset.note + s.glass + s.motion;
+  if (look !== lastLook) { lastLook = look; refreshAurora(); applyEngraving(); }
   syncBars();
   native.setHaptics(s.haptics !== false);
   setGlassMode(s.glass);
@@ -91,32 +94,35 @@ const scheduleRender = (() => {
   };
 })();
 
+// Scroll-linked custom properties go on the one element that reads each (never on #app or the
+// view: an inherited property changed there restyles the whole subtree on every scroll frame),
+// and only when the value actually changes.
+function setVar(el, name, v) {
+  if (el && el.style.getPropertyValue(name) !== v) el.style.setProperty(name, v);
+}
+
 function bindScroll(sc, sec) {
-  let lastY = sc.scrollTop, idle = 0;
-  const aurora = $('#aurora'), dock = $('#dock'), app = $('#app');
+  let lastY = sc.scrollTop;
+  const dock = $('#dock');
   const update = throttleRaf(() => {
     const y = sc.scrollTop;
-    sec.style.setProperty('--p', clamp((y - 30) / 26, 0, 1).toFixed(3));
-    sec.style.setProperty('--pull', clamp(-y / 140, 0, 1).toFixed(3));
-    if (sec.dataset.view === active) {
-      app.style.setProperty('--edge-top', clamp(y / 34, 0, 1).toFixed(3));
-      syncTopbar(sec, y);
-    }
+    setVar(sec.querySelector('.topbar'), '--p', clamp((y - 30) / 26, 0, 1).toFixed(3));
+    setVar(sec.querySelector('.lt h1'), '--pull', clamp(-y / 140, 0, 1).toFixed(3));
+    if (sec.dataset.view === active) syncTopbar(sec, y);
     const dy = y - lastY;
     if (y > 160 && dy > 5) dock.classList.add('mini');
     else if (dy < -5 || y < 80) dock.classList.remove('mini');
     lastY = y;
-    aurora.classList.add('paused');
-    clearTimeout(idle);
-    idle = setTimeout(() => aurora.classList.remove('paused'), 220);
+    holdAurora('scroll', true);
+    holdAurora('scroll', false, 220);
   });
   sc.addEventListener('scroll', update, { passive: true });
   update();
 }
 
 function syncTopbar(sec, y) {
-  const bar = $('#topbar');
-  bar.style.setProperty('--p', clamp((y - 30) / 26, 0, 1).toFixed(3));
+  setVar($('.edge-top'), '--edge-top', clamp(y / 34, 0, 1).toFixed(3));
+  setVar($('#topbar'), '--p', clamp((y - 30) / 26, 0, 1).toFixed(3));
   const t = sec.querySelector('.topbar-title')?.textContent || '';
   const title = $('#topbar-title');
   if (title.textContent !== t) title.textContent = t;
@@ -142,7 +148,6 @@ function showTab(name, opts = {}) {
   setActiveTab(name);
   nav.setTab(name);
   const sc = sections[name].querySelector('[data-scroller]');
-  $('#app').style.setProperty('--edge-top', clamp((sc?.scrollTop || 0) / 34, 0, 1).toFixed(3));
   syncTopbar(sections[name], sc?.scrollTop || 0);
   $('#dock').classList.remove('mini');
   native.haptic('selection');
@@ -176,16 +181,17 @@ function togglePrivacy(btn) {
 function explainBalance() {
   alertDialog({
     title: 'How your balance works',
-    message: 'Total balance = Cash + GPay/bank − what you owe on credit cards. A card spend lowers it immediately; paying the card bill later is a transfer, so it’s never counted twice.',
+    message: 'Total balance = Cash + GPay/bank. Credit cards are tracked separately against their limit, so a card spend doesn’t lower your balance. It goes down only when you pay the card bill (a transfer, so it’s never counted as spending twice).',
     confirm: 'Got it', icon: 'info',
   });
 }
 
 function themeSwitch(apply, x = innerWidth / 2, y = innerHeight / 2) {
-  const before = root.dataset.theme;
+  const look = () => root.dataset.theme + root.dataset.note;
+  const before = look();
   if (!document.startViewTransition || reducedMotion()) return apply();
   let changed = false;
-  const vt = document.startViewTransition(() => { apply(); changed = root.dataset.theme !== before; });
+  const vt = document.startViewTransition(() => { apply(); changed = look() !== before; });
   vt.ready.then(() => {
     if (!changed) return;
     const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
@@ -436,7 +442,7 @@ function boot() {
   };
   native.onNative('insets', d => { setKb(d.ime || 0); if (d.ime > 0) keepFocusVisible(); });
   document.addEventListener('focusin', () => { if (parseFloat(root.style.getPropertyValue('--kb')) > 0) keepFocusVisible(); });
-  onPresentationChange(n => { presenting = n; syncBars(); });
+  onPresentationChange(n => { presenting = n; syncBars(); holdAurora('sheet', n > 0); });
   if (native.platform === 'web' && native.isIOSDevice && native.isStandalone) root.classList.add('ios-pwa');
   if (window.visualViewport && native.platform !== 'android') {
     const vv = window.visualViewport;

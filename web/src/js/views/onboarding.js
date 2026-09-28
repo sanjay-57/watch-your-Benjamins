@@ -51,7 +51,7 @@ export function showOnboarding({ onDone }) {
       <div class="onb-feats">
         <div class="onb-feat"><span class="mglyph" style="--c:var(--pos-rgb)">${icon('shield')}</span><div><b>Private by design</b><span>No account, no cloud — it all stays on this phone.</span></div></div>
         <div class="onb-feat"><span class="mglyph" style="--c:var(--accent-rgb)">${icon('zap')}</span><div><b>Two taps to log</b><span>Calculator keypad, smart categories, quick-add.</span></div></div>
-        <div class="onb-feat"><span class="mglyph" style="--c:var(--m-card-rgb)">${icon('card')}</span><div><b>Cards done right</b><span>Card bills never double-count your spending.</span></div></div>
+        <div class="onb-feat"><span class="mglyph" style="--c:var(--m-card-rgb)">${icon('card')}</span><div><b>Cards done right</b><span>Card spends stay off your balance until you pay the bill.</span></div></div>
       </div>
       <div class="onb-actions">
         <button class="btn block glass tint btn-primary press" data-act="next">Get started</button>
