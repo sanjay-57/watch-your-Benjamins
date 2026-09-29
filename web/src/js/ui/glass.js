@@ -4,6 +4,7 @@
 //     gracefully keep the frosted material.
 //  2. Light: device tilt / pointer drives --lx/--ly on `.tilt` elements (specular rims, card sheen).
 import { clamp } from '../core/util.js';
+import { interacting } from './aurora.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 let defs = null;
@@ -175,7 +176,9 @@ function start() {
 }
 
 function aim(x, y) {
-  if (!lightOn) return;
+  // Each light move restyles and re-rasters the tilt cards; hand tremor alone keeps that going,
+  // so the light holds still while a finger, a scroll or a sheet has the page (see aurora.js).
+  if (!lightOn || interacting()) return;
   x = clamp(x, -1, 1);
   y = clamp(y, -1, 1);
   if (Math.abs(x - tx) < 0.025 && Math.abs(y - ty) < 0.025) return; // dead-band against sensor jitter

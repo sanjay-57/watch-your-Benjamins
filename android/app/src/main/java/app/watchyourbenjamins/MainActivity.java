@@ -7,7 +7,13 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.Manifest;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.graphics.drawable.Icon;
+import android.provider.DocumentsContract;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -69,12 +75,16 @@ import java.util.Map;
 public final class MainActivity extends Activity {
     private static final String TAG = "WYB";
     static final String HOST = "appassets.androidplatform.net";
+    /** Widget button, Quick Settings tile and launcher shortcut: open straight on the add sheet. */
+    static final String ACTION_ADD = "app.watchyourbenjamins.ADD";
     private static final String START_URL = "https://" + HOST + "/index.html";
     static final int BG_DARK = 0xFF07120C;
     static final int BG_LIGHT = 0xFFF2F0E6;
     private static final long READY_TIMEOUT_MS = 1200;
     private static final int REQ_SAVE = 1;
     private static final int REQ_OPEN = 2;
+    private static final int REQ_SMS_PERM = 3;
+    private static final int REQ_BACKUP_DIR = 4;
     private static final Map<String, String> NO_CACHE = Collections.singletonMap("Cache-Control", "no-cache");
 
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -99,6 +109,8 @@ public final class MainActivity extends Activity {
 
     private boolean webHandlesBack;
     private Object backCallback; // android.window.OnBackInvokedCallback (API 33+)
+
+    private volatile String launchAction; // set by a shortcut launch until the page has taken it
 
     private String pendingSaveName;
     private String pendingSaveContent;
@@ -142,13 +154,48 @@ public final class MainActivity extends Activity {
         w.getDecorView().getViewTreeObserver().addOnPreDrawListener(firstDrawGate);
         ui.postDelayed(readyTimeout, READY_TIMEOUT_MS);
 
+        handleLaunch(getIntent());
+        publishShortcuts();
         web.loadUrl(START_URL);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (handleLaunch(intent)) emit("shortcut", "{\"action\":\"add\"}");
+    }
+
+    private boolean handleLaunch(Intent intent) {
+        if (intent != null && ACTION_ADD.equals(intent.getAction())) {
+            launchAction = "add";
+            intent.setAction(Intent.ACTION_MAIN); // don't replay it after a configuration restart
+            return true;
+        }
+        return false;
+    }
+
+    /** Long-press the app icon → "Add expense". */
+    private void publishShortcuts() {
+        try {
+            ShortcutManager sm = getSystemService(ShortcutManager.class);
+            if (sm == null) return;
+            ShortcutInfo add = new ShortcutInfo.Builder(this, "add")
+                    .setShortLabel(getString(R.string.shortcut_add))
+                    .setIcon(Icon.createWithResource(this, R.drawable.ic_tile_add))
+                    .setIntent(new Intent(this, MainActivity.class).setAction(ACTION_ADD))
+                    .build();
+            sm.setDynamicShortcuts(Collections.singletonList(add));
+        } catch (RuntimeException e) {
+            Log.w(TAG, "shortcuts unavailable", e);
+        }
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         started = true;
+        SmsReceiver.listener = () -> emit("sms", "{}");
         if (webLost) {
             webLost = false;
             recreateWebView();
@@ -158,6 +205,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onStop() {
         started = false;
+        SmsReceiver.listener = null;
         super.onStop();
     }
 
@@ -212,9 +260,24 @@ public final class MainActivity extends Activity {
             finishSave(resultCode == RESULT_OK && data != null ? data.getData() : null);
         } else if (requestCode == REQ_OPEN) {
             finishOpen(resultCode, data);
+        } else if (requestCode == REQ_BACKUP_DIR) {
+            finishPickBackupDir(resultCode == RESULT_OK && data != null ? data.getData() : null);
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQ_SMS_PERM) {
+            emit("smsPermission", "{\"granted\":" + smsGranted() + "}");
+        } else {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+    }
+
+    private boolean smsGranted() {
+        return checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED;
     }
 
     // ------------------------------------------------------------------ WebView
@@ -568,6 +631,34 @@ public final class MainActivity extends Activity {
         cb.onReceiveValue(out.isEmpty() ? null : out.toArray(new Uri[0]));
     }
 
+    private void finishPickBackupDir(Uri tree) {
+        if (tree == null) {
+            emit("backupFolder", "{\"ok\":false,\"error\":\"cancelled\"}");
+            return;
+        }
+        try {
+            getContentResolver().takePersistableUriPermission(tree,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        } catch (SecurityException e) {
+            emit("backupFolder", "{\"ok\":false,\"error\":\"that folder can't be kept\"}");
+            return;
+        }
+        BackupFolder.save(this, tree);
+        emit("backupFolder", backupFolderJson(true));
+    }
+
+    private String backupFolderJson(boolean ok) {
+        Uri tree = BackupFolder.tree(this);
+        String name = tree == null ? null : BackupFolder.name(this, tree);
+        try {
+            JSONObject o = new JSONObject().put("ok", ok).put("set", name != null);
+            if (name != null) o.put("name", name);
+            return o.toString();
+        } catch (JSONException e) {
+            return "{\"ok\":false}";
+        }
+    }
+
     private void startChooser(Intent send) {
         try {
             startActivity(Intent.createChooser(send, null));
@@ -917,6 +1008,116 @@ public final class MainActivity extends Activity {
                 send.putExtra(Intent.EXTRA_SUBJECT, subject).putExtra(Intent.EXTRA_TITLE, subject);
             }
             ui.post(() -> startChooser(send));
+        }
+
+        // ---- automatic logging from IOB SMS alerts (see SmsReceiver / IobSms)
+
+        @JavascriptInterface
+        public String getSmsState() {
+            SmsReceiver.SmsStore st = new SmsReceiver.SmsStore(MainActivity.this);
+            try {
+                JSONObject o = new JSONObject().put("granted", smsGranted()).put("on", st.enabled()).put("last4", st.last4()).put("credits", st.credits());
+                JSONObject last = st.lastResult();
+                if (last != null) o.put("last", last);
+                return o.toString();
+            } catch (JSONException e) {
+                return "{}";
+            }
+        }
+
+        /** Turns the feature on/off for one account; nothing is captured unless on and last4 is 4 digits. */
+        @JavascriptInterface
+        public void setSmsConfig(boolean on, String last4, boolean credits) {
+            new SmsReceiver.SmsStore(MainActivity.this).setConfig(on, IobSms.cleanLast4(last4), credits);
+        }
+
+        @JavascriptInterface
+        public void requestSmsPermission() {
+            ui.post(() -> {
+                if (smsGranted()) emit("smsPermission", "{\"granted\":true}");
+                else requestPermissions(new String[]{Manifest.permission.RECEIVE_SMS}, REQ_SMS_PERM);
+            });
+        }
+
+        /** JSON array of {id, paise, ref, to, dir, ts}; entries stay queued until ackSms(). */
+        @JavascriptInterface
+        public String getPendingSms() {
+            return new SmsReceiver.SmsStore(MainActivity.this).pendingJson();
+        }
+
+        @JavascriptInterface
+        public void ackSms(String idsJson) {
+            new SmsReceiver.SmsStore(MainActivity.this).ack(idsJson);
+        }
+
+        // ---- automatic backups into a user-chosen folder (see BackupFolder)
+
+        @JavascriptInterface
+        public void pickBackupFolder() {
+            ui.post(() -> {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+                try {
+                    startActivityForResult(i, REQ_BACKUP_DIR);
+                } catch (ActivityNotFoundException e) {
+                    emit("backupFolder", "{\"ok\":false,\"error\":\"no folder picker on this phone\"}");
+                }
+            });
+        }
+
+        /** {"ok":true,"set":bool,"name":"Folder"?}; set=false also when the folder was deleted. */
+        @JavascriptInterface
+        public String getBackupFolder() {
+            return backupFolderJson(true);
+        }
+
+        @JavascriptInterface
+        public void clearBackupFolder() {
+            Uri tree = BackupFolder.tree(MainActivity.this);
+            if (tree != null) {
+                try {
+                    getContentResolver().releasePersistableUriPermission(tree,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            BackupFolder.clear(MainActivity.this);
+        }
+
+        /** Writes one file into the chosen folder (off the JS thread); emits backupWritten {ok, name?, error?}. */
+        @JavascriptInterface
+        public void writeBackup(String name, String content) {
+            final String n = safeFileName(name, BackupFolder.PREFIX + "backup.json");
+            final String c = content == null ? "" : content;
+            new Thread(() -> {
+                JSONObject o = new JSONObject();
+                try {
+                    o.put("ok", true).put("name", BackupFolder.write(MainActivity.this, n, c));
+                } catch (Exception e) {
+                    try {
+                        o = new JSONObject().put("ok", false).put("error", e.getMessage() != null ? e.getMessage() : e.toString());
+                    } catch (JSONException ignored) {
+                    }
+                }
+                emit("backupWritten", o.toString());
+            }, "wyb-backup").start();
+        }
+
+        // ---- shortcuts / widget
+
+        /** "add" once after a widget / tile / shortcut launch, else "". */
+        @JavascriptInterface
+        public String takeLaunchAction() {
+            String a = launchAction;
+            launchAction = null;
+            return a == null ? "" : a;
+        }
+
+        /** {title, main, sub}: what the home-screen widget shows. */
+        @JavascriptInterface
+        public void setWidgetData(String json) {
+            WidgetProvider.publish(MainActivity.this, json == null ? "{}" : json);
         }
 
         @JavascriptInterface

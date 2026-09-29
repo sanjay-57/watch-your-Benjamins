@@ -12,9 +12,14 @@ export const onPresentationChange = fn => { onPresentChange = fn; };
 export const sheetsOpen = () => open.length;
 export const topSheet = () => open[open.length - 1];
 
+let idleTimer = 0;
 function present() {
   const n = open.length;
   const app = $('#app');
+  // .sheet-busy outlives the last sheet by the page's scale-back (#app transition, .56s)
+  clearTimeout(idleTimer);
+  if (n) document.body.classList.add('sheet-busy');
+  else idleTimer = setTimeout(() => document.body.classList.remove('sheet-busy'), 600);
   app.classList.toggle('presented', n === 1);
   app.classList.toggle('presented-2', n >= 2);
   document.body.classList.toggle('presenting', n > 0);
@@ -80,10 +85,12 @@ export function openSheet(opts = {}) {
   const token = nav.push({ close: ({ fromBack }) => close({ fromBack }) });
   el.addEventListener('click', e => { if (e.target.closest('[data-close]')) close(); });
 
-  const h = el.offsetHeight;
-  el.style.transform = `translate3d(0,${h + 40}px,0)`;
+  // Until the next frame the stylesheet parks the sheet below the screen. Measure there, not
+  // here: callers (the add sheet) fill their content after openSheet returns, and an early read
+  // would both force an extra layout and size the slide for an empty sheet (it would pop in).
   present();
   requestAnimationFrame(() => {
+    const h = el.offsetHeight;
     api.shown = true;
     el.style.transform = 'translate3d(0,0,0)';
     animate(el, [{ transform: `translate3d(0,${h + 40}px,0)` }, { transform: 'translate3d(0,0,0)' }], { duration: SPR.sheet.duration, easing: SPR.sheet.easing });

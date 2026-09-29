@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Benjamins</string>
+    <string name="widget_desc">Safe-to-spend today, with a one-tap Add button</string>
+    <string name="tile_label">Add expense</string>
+    <string name="shortcut_add">Add expense</string>
 </resources>

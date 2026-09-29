@@ -6,7 +6,7 @@ balance stays correct: credit cards are tracked separately against their limit, 
 
 | | |
 |---|---|
-| **Android** | `releases/Benjamins-v1.0.0.apk`. It's about 150 KB and needs **no permissions** (not even internet). |
+| **Android** | `releases/Benjamins-v1.0.0.apk`. It's about 150 KB and has **no internet permission**. The only permission it can ask for is SMS, and only if you switch on *Auto-log UPI* (see below). |
 | **iPhone** | Install it from Safari as a home-screen web app. The `ios/` Xcode project also runs it natively on your own phone. |
 | **Data** | Stays on the phone only (IndexedDB plus a localStorage cache). Back up to a JSON file whenever you like. |
 
@@ -72,6 +72,16 @@ The screenshots show the built-in sample data. To try it yourself, choose **Expl
   - Plain-English highlights, e.g. "Weekends cost you 1.8× more…".
 - **Budgets:** a monthly ring on Home that shows a *safe-to-spend per day* figure.
 - **Recurring payments:** rent, salary and subscriptions get logged automatically every month.
+- **Auto-log UPI (Android, optional):** logs GPay/PhonePe/any UPI payment from **one Indian Overseas Bank account** by reading the bank's own SMS alert.
+  - Turn it on in *Settings → Auto-log UPI*: enter the last 4 digits of your IOB account, pick the account to log into (e.g. GPay) and allow SMS access.
+  - Only an SMS from an IOB sender that is a UPI debit (or, if you leave *Money received* on, a UPI credit) for that exact account is used. Other banks, other IOB accounts, OTPs and every other text are ignored and never stored.
+  - **Automatic** adds each payment as it arrives; **Ask me first** parks it on Home with *Add / Skip*. Each payment is added once (de-duplicated by the UPI reference) and lands in *Other* for you to categorise.
+  - **No double entries:** if you already logged the payment by hand, the alert is matched to your entry instead of adding it again. Log something by hand that an alert already logged and you get an "Already logged?" prompt.
+  - It needs the SMS permission. On a sideloaded APK, Android may grey it out: open *App info → ⋮ → Allow restricted settings* first. There is still no internet permission, so nothing can leave the phone.
+- **Budget warnings:** when a spend takes a category (or the month) past 80% or 100% of its budget, the confirmation says so. Categories near their limit show on Home. Home also shows a **month-end forecast** (spent so far, plus everyday spending at your pace, plus recurring payments still due).
+- **Search & filters:** Activity takes `>500` / `<=100` in the search box, plus date range, amount range and account filters, and **saved searches** you can reopen in one tap.
+- **Automatic backup (Android):** *Settings → Automatic backup* saves a copy into a folder you pick (Drive, Downloads, SD card…), daily, weekly or monthly, keeping the newest 10. On every platform, Home reminds you when your last backup is over 2 weeks old.
+- **Home-screen widget, Quick Settings tile and app shortcut (Android):** the widget shows today's safe-to-spend and your balance with a one-tap **+ Add**; the tile and the long-press shortcut open the add sheet straight away. (The widget refreshes whenever the app is opened or used.)
 - **Wallet:** Apple-Wallet-style card stack. Each account has a running-balance ledger. You can correct a balance or the amount owed.
 - **Privacy:**
   - Hide amounts with the eye button, or have them hidden every time the app opens.
@@ -92,7 +102,7 @@ The screenshots show the built-in sample data. To try it yourself, choose **Expl
 
 1. Send `releases/Benjamins-v1.0.0.apk` as a **Document** in WhatsApp. Photo or media mode would mangle it.
 2. The friend taps the file, then **Install**. The first time, Android asks them to allow installing from WhatsApp or their file manager: *Settings → Install unknown apps*.
-3. Play Protect may say *"App scan recommended"*. Tapping **Scan app** clears it. The app requests no permissions, so it passes.
+3. Play Protect may say *"App scan recommended"*. Tapping **Scan app** clears it. The app has no internet permission (and asks for SMS only if you turn on Auto-log UPI), so it passes.
 
 **Updates:** you must sign every future version with the **same key**:
 - The key is `android/keystore/benjamins-release.jks`.

@@ -1,15 +1,17 @@
 import { $, esc, debounce } from '../core/util.js';
-import { money, plainNumber, fromMinor } from '../core/money.js';
+import { money, plainNumber, fromMinor, toMinor } from '../core/money.js';
 import { fmtMonth, thisMonth } from '../core/dates.js';
 import { store, account, category, methodOf, monthsWithData } from '../core/store.js';
 import { icon } from '../ui/icons.js';
 import { openMenu } from '../ui/overlays.js';
 import { groupByDay, dayGroupHTML, emptyState } from './common.js';
+import { openFilterSheet, BLANK, advancedCount, amountLabel } from './filters.js';
+import { fmtShortDate } from '../core/dates.js';
 
-export const F = { q: '', type: 'all', method: 'all', month: 'all', cat: null, acct: null, limit: 150 };
+export const F = { ...BLANK, limit: 150 };
 
 export function setActivityFilter(patch) {
-  Object.assign(F, { q: '', type: 'all', method: 'all', month: 'all', cat: null, acct: null, limit: 150 }, patch);
+  Object.assign(F, BLANK, { limit: 150 }, patch);
 }
 
 function hay(t) {
@@ -17,8 +19,22 @@ function hay(t) {
   return `${t.note} ${c?.name || ''} ${a?.name || ''} ${b?.name || ''} ${plainNumber(t.amount)} ${fromMinor(Math.abs(t.amount))} ${t.type}`.toLowerCase();
 }
 
+/** "coffee >200 <=1000" → text "coffee", min 20001 (minor units, exclusive), max 100000. */
+function parseQuery(q) {
+  let min = null, max = null;
+  const text = q.replace(/(?:^|\s)([<>]=?)\s*(\d[\d,]*(?:\.\d+)?)(?=\s|$)/g, (m, op, n) => {
+    const v = toMinor(n.replace(/,/g, ''));
+    if (op[0] === '>') min = Math.max(min ?? 0, op === '>' ? v + 1 : v);
+    else max = Math.min(max ?? Infinity, op === '<' ? v - 1 : v);
+    return ' ';
+  }).trim();
+  return { text, min, max };
+}
+
 function filtered() {
-  const q = F.q.trim().toLowerCase();
+  const { text, min: qMin, max: qMax } = parseQuery(F.q.trim().toLowerCase());
+  const min = F.min != null ? Math.max(F.min, qMin ?? 0) : qMin;
+  const max = F.max != null ? Math.min(F.max, qMax ?? Infinity) : qMax;
   return store.txs.filter(t => {
     if (F.type !== 'all' && t.type !== F.type) return false;
     if (F.method !== 'all') {
@@ -27,9 +43,13 @@ function filtered() {
       else if (m !== F.method) return false;
     }
     if (F.month !== 'all' && !t.date.startsWith(F.month)) return false;
+    if (F.from && t.date < F.from) return false;
+    if (F.to && t.date > F.to) return false;
+    if (min != null && t.amount < min) return false;
+    if (max != null && t.amount > max) return false;
     if (F.cat && t.categoryId !== F.cat) return false;
     if (F.acct && t.accountId !== F.acct && t.toAccountId !== F.acct) return false;
-    if (q && !hay(t).includes(q)) return false;
+    if (text && !hay(t).includes(text)) return false;
     return true;
   });
 }
@@ -81,11 +101,21 @@ function chipsHTML() {
   const extra = [];
   if (F.cat) { const c = category(F.cat); extra.push(`<button class="chip on" data-act="clear-cat">${esc(c?.emoji || '')} ${esc(c?.name || 'Category')} ${icon('close', 'xs')}</button>`); }
   if (F.acct) { const a = account(F.acct); extra.push(`<button class="chip on" data-act="clear-acct">${esc(a?.name || 'Account')} ${icon('close', 'xs')}</button>`); }
-  return `${extra.join('')}
+  if (F.from || F.to) extra.push(`<button class="chip on" data-act="clear-range">${icon('calendar')}${esc(F.from ? fmtShortDate(F.from) : 'Start')} – ${esc(F.to ? fmtShortDate(F.to) : 'now')} ${icon('close', 'xs')}</button>`);
+  if (F.min != null || F.max != null) extra.push(`<button class="chip on" data-act="clear-amount">${esc(amountLabel(F))} ${icon('close', 'xs')}</button>`);
+  const n = advancedCount(F);
+  return `<button class="chip ${n ? 'on' : ''}" data-act="filters">${icon('sliders')}Filters${n ? ` · ${n}` : ''}</button>${extra.join('')}
     <button class="chip ${F.month !== 'all' ? 'on' : ''}" data-act="month">${icon('calendar')}${esc(F.month === 'all' ? 'All time' : fmtMonth(F.month, { short: true }))}${icon('chev-d', 'xs')}</button>
     ${TYPE_CHIPS.map(([k, l]) => `<button class="chip" data-type="${k}" aria-pressed="${F.type === k}">${l}</button>`).join('')}
     <span style="width:1px;flex:none;background:var(--sep);margin:6px 2px"></span>
     ${METHOD_CHIPS.map(([k, l, ic]) => `<button class="chip" data-method="${k}" aria-pressed="${F.method === k}">${icon(ic)}${l}</button>`).join('')}`;
+}
+
+/** One-tap saved searches, shown under the filter chips. */
+function savedHTML() {
+  const list = store.settings.savedFilters;
+  if (!list.length) return '';
+  return `<span class="t-foot t3" style="flex:none;align-self:center;padding:0 2px">Saved</span>${list.map(s => `<button class="chip" data-act="saved" data-id="${esc(s.id)}">${icon('search')}${esc(s.name)}</button>`).join('')}`;
 }
 
 let io = null;
@@ -96,8 +126,9 @@ export function renderActivity(root) {
   <div class="scroller" data-scroller>
     <div class="page enter">
       <header class="lt" style="--n:0"><div><span class="eyebrow">${store.txs.length} transactions</span><h1>Activity</h1></div></header>
-      <label class="searchbar glass" style="--n:1">${icon('search', 'sm')}<input id="act-q" type="search" placeholder="Search notes, categories, amounts" value="${esc(F.q)}" autocomplete="off" enterkeyhint="search">${F.q ? `<button class="icon-btn sm" data-act="clear-q" aria-label="Clear">${icon('x-circle', 'sm')}</button>` : ''}</label>
+      <label class="searchbar glass" style="--n:1">${icon('search', 'sm')}<input id="act-q" type="search" placeholder="Search notes, categories, amounts (try >500)" value="${esc(F.q)}" autocomplete="off" enterkeyhint="search">${F.q ? `<button class="icon-btn sm" data-act="clear-q" aria-label="Clear">${icon('x-circle', 'sm')}</button>` : ''}</label>
       <div class="chips" id="act-chips" style="--n:2;margin-top:12px">${chipsHTML()}</div>
+      <div class="chips" id="act-saved" style="--n:2;margin-top:8px;${store.settings.savedFilters.length ? '' : 'display:none'}">${savedHTML()}</div>
       <div class="act-sum glass" id="act-sum" style="--n:3;margin-top:12px">${summaryHTML(list)}</div>
       <div class="tx-list" id="act-list" style="--n:4">${listHTML(list)}</div>
     </div>
@@ -111,6 +142,9 @@ function refreshResults(root) {
   $('#act-sum', root).innerHTML = summaryHTML(list);
   $('#act-list', root).innerHTML = listHTML(list);
   $('#act-chips', root).innerHTML = chipsHTML();
+  const sv = $('#act-saved', root);
+  sv.innerHTML = savedHTML();
+  sv.style.display = store.settings.savedFilters.length ? '' : 'none';
   observeMore(root);
 }
 
@@ -149,6 +183,16 @@ export function bindActivity(root, { onAdd }) {
     if (act === 'clear-q') { F.q = ''; const i = $('#act-q', root); i.value = ''; refreshResults(root); e.target.closest('[data-act]').remove(); return; }
     if (act === 'clear-cat') { F.cat = null; return refreshResults(root); }
     if (act === 'clear-acct') { F.acct = null; return refreshResults(root); }
+    if (act === 'clear-range') { F.from = F.to = ''; return refreshResults(root); }
+    if (act === 'clear-amount') { F.min = F.max = null; return refreshResults(root); }
+    if (act === 'filters') {
+      return void openFilterSheet({ current: F, onApply: patch => { Object.assign(F, BLANK, patch, { limit: 150 }); const i = $('#act-q', root); if (i) i.value = F.q; refreshResults(root); } });
+    }
+    if (act === 'saved') {
+      const sv = store.settings.savedFilters.find(x => x.id === e.target.closest('[data-act]').dataset.id);
+      if (sv) { Object.assign(F, BLANK, sv.f, { limit: 150 }); const i = $('#act-q', root); if (i) i.value = F.q; refreshResults(root); }
+      return;
+    }
     if (act === 'clear') { setActivityFilter({}); const i = $('#act-q', root); if (i) i.value = ''; return refreshResults(root); }
     if (act === 'month') {
       const months = monthsWithData();

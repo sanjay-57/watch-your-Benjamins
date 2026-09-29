@@ -106,15 +106,42 @@
 .press-lg:active,
 .press-lg.is-pressed { transform: scale(.975); }
 
-/* Blink (Android WebView / Chrome) re-runs every backdrop filter on every frame in which
-   anything behind or in front of it moves, i.e. every card on every scroll frame. In-page glass
-   only ever sits over the aurora, a soft 1/5-resolution gradient that a blur cannot visibly
-   change, so there it keeps the colour lift and drops the (costly, multi-pass) blur. Sheets,
-   the dock and the scroll edges, which float over real content, keep theirs. */
+/* Blink (Android WebView / Chrome) gives every backdrop-filtered element its own render pass
+   that reads back and re-filters what's behind it on every frame in which anything moves:
+   every card, on every scroll frame and every frame of a sheet presenting. In-page glass only
+   ever sits over the aurora, a soft 1/5-resolution gradient that neither a blur nor a colour
+   lift visibly changes, so there it drops the backdrop pass entirely (isolation keeps the
+   hero's plus-lighter glow blending inside the card instead of forcing a pass of its own).
+   Sheets, the dock and the scroll edges, which float over real content, keep theirs. */
 .blink .view .glass,
 .blink .view .glass-clear {
-  -webkit-backdrop-filter: saturate(var(--g-sat)) brightness(var(--g-bright));
-  backdrop-filter: saturate(var(--g-sat)) brightness(var(--g-bright));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  isolation: isolate;
+}
+/* stands in for the dropped saturate() lift: a touch of the aurora's own lead colour */
+.blink .view .glass:not(.tint) {
+  background-color: color-mix(in srgb, var(--g-tint), rgb(var(--au1)) 16%);
+}
+
+/* Sheets: a 34px blur over half the screen, re-run on every frame the sheet, the page behind it
+   or anything inside it moves (every keypad press), was the costliest thing Blink drew — about a
+   third of the dropped frames when opening the add sheet on a 120 Hz phone. There a sheet is
+   thick, opaque glass of the same colour instead. */
+.blink .sheet {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--g-sheen), linear-gradient(var(--g-tint-thick), var(--g-tint-thick)), color-mix(in srgb, var(--bg), rgb(var(--au1)) 22%);
+}
+
+/* While a sheet is up — and until the page behind has scaled fully back (sheet.js holds
+   .sheet-busy a little past the close) — the page sits under the scrim, where lens refraction and
+   scroll-edge blur can't be seen but would still re-run on every frame of the scale. */
+.blink .sheet-busy .edge > i,
+.blink .sheet-busy #tabbar,
+.blink .sheet-busy #fab {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* ---- quality tiers ---- */

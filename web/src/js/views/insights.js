@@ -1,7 +1,7 @@
 import { $, esc } from '../core/util.js';
 import { money } from '../core/money.js';
 import { thisMonth, addMonths, fmtMonth, daysInMonth, todayKey, weekdayShort, fmtShortDate } from '../core/dates.js';
-import { store, monthStats, trend, category, account, activeAccounts, monthsWithData } from '../core/store.js';
+import { store, monthStats, trend, category, account, activeAccounts, monthsWithData, forecast } from '../core/store.js';
 import { haptic } from '../core/native.js';
 import { icon } from '../ui/icons.js';
 import { donut, bars, pairBars } from '../ui/charts.js';
@@ -35,9 +35,10 @@ function smartInsights(mk, ms) {
     const c = category(top[0]);
     out.push([c?.emoji || '🏷️', `<b>${esc(c?.name || 'Other')}</b> is your top category — <b>${pct(top[1], ms.expense)}%</b> of spending (${esc(money(top[1]))}).`]);
   }
-  if (isNow && ms.expense && dayN >= 5 && dayN < dim) {
-    const proj = Math.round((ms.expense / dayN) * dim);
-    out.push(['🔮', `At this pace you’ll spend about <b>${esc(money(proj, { decimals: 'never' }))}</b> by month-end${store.settings.budget ? ` (${proj > store.settings.budget ? 'over' : 'within'} your ${esc(money(store.settings.budget, { decimals: 'never' }))} budget)` : ''}.`]);
+  const fc = isNow ? forecast() : null;
+  if (fc && dayN >= 5 && dayN < dim) {
+    const b = store.settings.budget;
+    out.push(['🔮', `You’re on pace to spend about <b>${esc(money(fc.proj, { decimals: 'never' }))}</b> by month-end${fc.coming ? ` (including ${esc(money(fc.coming, { decimals: 'never' }))} of recurring payments still to come)` : ''}${b ? ` — ${fc.proj > b ? `<b>${esc(money(fc.proj - b, { decimals: 'never' }))} over</b>` : `${esc(money(b - fc.proj, { decimals: 'never' }))} under`} your ${esc(money(b, { decimals: 'never' }))} budget` : ''}.`]);
   }
   // weekends vs weekdays (per-day averages of everyday spending — fixed bills excluded)
   const FIXED = new Set(['rent', 'emi', 'bills', 'subscriptions', 'education']);

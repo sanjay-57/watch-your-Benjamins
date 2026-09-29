@@ -1,10 +1,10 @@
 // Add / edit transaction sheet: calculator keypad, method pickers, category grid.
 import { $, $$, esc } from '../core/util.js';
 import { cur, money, fromMinor } from '../core/money.js';
-import { todayKey, addDays, fmtDay, nowTime, isValidKey, ordinal } from '../core/dates.js';
+import { todayKey, addDays, fmtDay, fmtTime, nowTime, isValidKey, ordinal } from '../core/dates.js';
 import {
   store, account, category, activeAccounts, catOrder, balances, cardInfo,
-  addTx, updateTx, deleteTx, restoreTx, addRecurring, nextOccurrence,
+  addTx, updateTx, deleteTx, restoreTx, addRecurring, nextOccurrence, findAutoDuplicate, budgetCrossing,
   preset as getPreset, resolvePreset, addPreset, updatePreset, removePreset,
 } from '../core/store.js';
 import { haptic } from '../core/native.js';
@@ -347,8 +347,16 @@ export function openTxSheet({ tx = null, preset = {}, mode = 'tx', buttonId = nu
       toast('Changes saved', { sub: `${txTitle(t)} · ${money(t.amount)}` });
       return;
     }
+    // an IOB alert may already have logged this very payment: ask before doubling it
+    const dup = findAutoDuplicate(data);
+    if (dup && !(await confirmDialog({
+      title: 'Already logged?',
+      message: `${money(dup.amount)} on ${account(dup.accountId)?.name || 'this account'} was added automatically at ${fmtTime(dup.time)} from your bank alert. Add this one as well?`,
+      confirm: 'Add anyway', cancel: 'Cancel', icon: 'copy', tone: 'warn',
+    }))) return;
     const t = addTx(data);
     if (!t) { toast('Couldn’t save — try again', { icon: 'alert', tone: 'neg' }); return; }
+    warn = warn || budgetCrossing(t);
     if (st.repeat) {
       const day = +st.date.slice(8);
       addRecurring({ ...data, day, next: nextOccurrence(day, st.date) });

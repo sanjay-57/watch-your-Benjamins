@@ -32,16 +32,19 @@ export function monotonePath(pts) {
 
 let gid = 0;
 
-/** Area sparkline scaled to a 1000×h viewBox (stretches to the container width). */
+/** Area sparkline scaled to a 1000×h viewBox (stretches to the container width).
+ *  series: evenly spaced values, or [x 0..1, value] points. */
 export function sparkArea(series, { h = 74, color = 'var(--accent)', dot = true } = {}) {
   const n = series.length;
   if (n < 2) return '';
+  const xy = typeof series[0] === 'number' ? series.map((v, i) => [i / (n - 1), v]) : series;
   const W = 1000;
-  let lo = Math.min(...series), hi = Math.max(...series);
+  const vals = xy.map(p => p[1]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
   const pad = (hi - lo) * 0.18 || Math.max(1, Math.abs(hi) * 0.05);
   lo -= pad; hi += pad;
   const top = 8, bottom = h - 4;
-  const pts = series.map((v, i) => [(i / (n - 1)) * W, bottom - ((v - lo) / (hi - lo)) * (bottom - top)]);
+  const pts = xy.map(([x, v]) => [x * W, bottom - ((v - lo) / (hi - lo)) * (bottom - top)]);
   const line = monotonePath(pts);
   const id = 'sg' + ++gid;
   const last = pts[n - 1];

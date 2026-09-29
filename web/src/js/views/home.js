@@ -1,7 +1,9 @@
 import { $, esc, initials } from '../core/util.js';
 import { money } from '../core/money.js';
-import { thisMonth, addMonths, daysInMonth, todayKey, greeting, fmtMonth, fmtDay } from '../core/dates.js';
-import { store, totals, monthStats, balanceSeries, upcoming, account, category, activeAccounts, presetList, resolvePreset } from '../core/store.js';
+import { thisMonth, addMonths, daysInMonth, todayKey, greeting, fmtMonth, fmtDay, fmtTime } from '../core/dates.js';
+import { store, totals, monthStats, balanceSeries, upcoming, account, category, activeAccounts, presetList, resolvePreset, budgetWatch, forecast } from '../core/store.js';
+import { reviewItems } from './autolog.js';
+import { backupNudge, backupSupported } from './backup.js';
 import { icon } from '../ui/icons.js';
 import { sparkArea, ring } from '../ui/charts.js';
 import { odometer } from '../ui/odometer.js';
@@ -38,6 +40,9 @@ export function renderHome(root) {
   const expCh = change(ms.expense, pm.expense);
   const avgDay = dayN ? Math.round(ms.expense / dayN) : 0;
 
+  // ---- month-end forecast (needs a few days of data)
+  const fc = forecast();
+
   // ---- budget
   let budgetHTML = '';
   if (s.budget > 0) {
@@ -53,7 +58,7 @@ export function renderHome(root) {
           <h3>${left >= 0 ? `<span class="amt">${esc(money(left))}</span> left this month` : `Over budget by <span class="amt">${esc(money(-left))}</span>`}</h3>
           <p>${left >= 0
             ? `You can spend about <b class="amt">${esc(money(Math.floor(left / daysLeft), { decimals: 'never' }))}</b>/day for the next ${daysLeft} day${daysLeft > 1 ? 's' : ''}.`
-            : 'Time to slow down — every rupee from here adds to the overshoot.'.replace('rupee', s.currency === 'INR' ? 'rupee' : 'penny')}</p>
+            : 'Time to slow down — every rupee from here adds to the overshoot.'.replace('rupee', s.currency === 'INR' ? 'rupee' : 'penny')}${fc && left >= 0 ? `<br>On pace for <b class="amt">${esc(money(fc.proj, { decimals: 'never' }))}</b> by month-end${fc.proj > s.budget ? `, <span class="neg">${esc(money(fc.proj - s.budget, { decimals: 'never' }))} over</span>` : `, ${esc(money(s.budget - fc.proj, { decimals: 'never' }))} to spare`}.` : ''}</p>
         </div>
         ${icon('chev-r', 'sm')}
       </button>`;
@@ -84,6 +89,38 @@ export function renderHome(root) {
       ${icon('repeat', 'sm')}
     </button>`;
   }).join('');
+
+  // ---- payments waiting for your yes/no (auto-log in "ask me first" mode)
+  const rv = reviewItems();
+  const reviewHTML = rv.length ? `
+    <div class="stack" style="--n:3">
+      <div class="section-h" style="margin:2px 6px -2px"><h2>${rv.length} payment${rv.length > 1 ? 's' : ''} to review</h2>${rv.length > 1 ? '<button class="link" data-act="review-all">Add all</button>' : ''}</div>
+      ${rv.map(r => `<div class="alert glass">
+        <span class="mglyph" style="--c:${r.credit ? 'var(--pos-rgb)' : 'var(--m-upi-rgb)'}">${icon(r.credit ? 'in' : 'upi')}</span>
+        <div class="main"><div class="title ellip"><span class="amt">${esc(money(r.credit ? r.tx.amount : -r.tx.amount))}</span></div><div class="meta ellip">${esc(r.tx.note)} · ${esc(fmtDay(r.tx.date))}, ${esc(fmtTime(r.tx.time))}</div></div>
+        <button class="btn sm btn-plain press" data-act="review-skip" data-id="${esc(r.id)}">Skip</button>
+        <button class="btn sm glass tint btn-primary press" data-act="review-add" data-id="${esc(r.id)}">Add</button>
+      </div>`).join('')}
+    </div>` : '';
+
+  // ---- categories close to (or past) their monthly budget
+  const watchHTML = budgetWatch().slice(0, 3).map((w, i) => {
+    const over = w.pct >= 100;
+    return `<button class="alert glass press-lg press" data-act="cat-budget" data-id="${esc(w.category.id)}" style="--n:${5 + i};width:100%;text-align:left">
+      <span class="ebadge sm" style="--c:${catRGB(w.category)}">${esc(w.category.emoji)}</span>
+      <div class="main"><div class="title ellip">${esc(w.category.name)} · <span class="${over ? 'neg' : ''}">${w.pct}%</span></div><div class="meta"><span class="amt">${esc(money(w.spent))}</span> of <span class="amt">${esc(money(w.budget))}</span> budget${over ? ' · over' : ''}</div></div>
+      ${icon('chev-r', 'sm')}
+    </button>`;
+  }).join('');
+
+  // ---- nudge to back up
+  const bk = backupNudge();
+  const bkHTML = bk ? `<div class="alert glass" style="--n:6">
+      <span class="mglyph" style="--c:var(--warn-rgb)">${icon('database')}</span>
+      <div class="main"><div class="title ellip">Back up your data</div><div class="meta">${bk.never ? 'You haven’t made a backup yet' : `Last backup ${bk.days} days ago`}</div></div>
+      <button class="btn sm btn-plain press" data-act="backup-later">Later</button>
+      <button class="btn sm glass tint btn-primary press" data-act="backup-now">${backupSupported ? 'Set up' : 'Back up'}</button>
+    </div>` : '';
 
   // ---- spending by method
   const methodsTotal = ms.byMethod.cash + ms.byMethod.upi + ms.byMethod.card;
@@ -174,11 +211,12 @@ export function renderHome(root) {
         <button class="tile glass press" data-act="month-tile" data-type="expense" style="text-align:left">
           <div class="tk"><span class="ic" style="--c:var(--spend-rgb)">${icon('out')}</span>Spent</div>
           <div class="tv amt">${esc(money(ms.expense))}</div>
-          <div class="ts">${ms.expCount ? `${esc(money(avgDay, { decimals: 'never' }))}/day${expCh ? ` · ${expCh > 0 ? '▲' : '▼'} ${Math.abs(expCh)}%` : ''}` : 'Nothing yet'}</div>
+          <div class="ts">${ms.expCount ? (fc && !s.budget ? `≈ ${esc(money(fc.proj, { decimals: 'never' }))} by month-end` : `${esc(money(avgDay, { decimals: 'never' }))}/day${expCh ? ` · ${expCh > 0 ? '▲' : '▼'} ${Math.abs(expCh)}%` : ''}`) : 'Nothing yet'}</div>
         </button>
       </div>
 
-      ${budgetHTML || upsHTML ? `<div class="stack" style="margin-top:14px">${budgetHTML}${upsHTML}</div>` : ''}
+      ${reviewHTML ? `<div style="margin-top:14px">${reviewHTML}</div>` : ''}
+      ${budgetHTML || upsHTML || watchHTML || bkHTML ? `<div class="stack" style="margin-top:14px">${budgetHTML}${upsHTML}${watchHTML}${bkHTML}</div>` : ''}
       ${methodsHTML ? `<div style="margin-top:14px">${methodsHTML}</div>` : ''}
       ${quickHTML}
       ${recentHTML}

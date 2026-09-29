@@ -11,6 +11,8 @@ import { toast, confirmDialog } from '../ui/overlays.js';
 import { icon } from '../ui/icons.js';
 import { openCurrencyPicker, openCategoriesManager, openBudgetSheet, openRecurringManager } from './manage.js';
 import { openPresetManager } from './presets.js';
+import { openAutoLogSheet, autoLogSummary, smsSupported } from './autolog.js';
+import { openBackupSheet, backupSummary, backupSupported, backupNow } from './backup.js';
 import { setupLock, disableLock } from './lock.js';
 import { NOTES, currentNote } from '../ui/notes.js';
 
@@ -65,6 +67,7 @@ export function openSettings({ onThemeChange, restartOnboarding } = {}) {
         <button class="cell" data-act="categories"><span class="cell-icon" style="--c:var(--m-upi-rgb)">${icon('grid')}</span><span class="label">Categories</span><span class="value">${store.categories.length}</span>${icon('chev-r', 'chev')}</button>
         <button class="cell" data-act="quickbtns"><span class="cell-icon" style="--c:var(--accent-rgb)">${icon('zap')}</span><span class="label">Quick buttons</span><span class="value">${store.presets.length}</span>${icon('chev-r', 'chev')}</button>
         <button class="cell" data-act="recurring"><span class="cell-icon" style="--c:var(--xfer-rgb)">${icon('repeat')}</span><span class="label">Recurring payments</span><span class="value">${store.recurring.filter(r => r.active).length || 'None'}</span>${icon('chev-r', 'chev')}</button>
+        ${smsSupported ? `<button class="cell" data-act="autolog"><span class="cell-icon" style="--c:var(--m-upi-rgb)">${icon('upi')}</span><span class="label">Auto-log UPI<small>From your IOB SMS alerts</small></span><span class="value">${esc(autoLogSummary())}</span>${icon('chev-r', 'chev')}</button>` : ''}
       </div>
 
       <div class="caps" style="padding:22px 6px 8px">Appearance</div>
@@ -88,6 +91,7 @@ export function openSettings({ onThemeChange, restartOnboarding } = {}) {
 
       <div class="caps" style="padding:22px 6px 8px">Your data</div>
       <div class="glass group">
+        ${backupSupported ? `<button class="cell" data-act="autobackup"><span class="cell-icon" style="--c:var(--warn-rgb)">${icon('database')}</span><span class="label">Automatic backup<small>Saved to a folder you choose</small></span><span class="value">${esc(backupSummary())}</span>${icon('chev-r', 'chev')}</button>` : ''}
         <button class="cell" data-act="backup"><span class="cell-icon" style="--c:var(--accent-rgb)">${icon('download')}</span><span class="label">Back up now<small>Last backup: ${esc(lastB)}</small></span>${icon('chev-r', 'chev')}</button>
         <button class="cell" data-act="share-backup"><span class="cell-icon" style="--c:var(--m-cash-rgb)">${icon('share')}</span><span class="label">Send backup<small>WhatsApp, Drive, email…</small></span>${icon('chev-r', 'chev')}</button>
         <button class="cell" data-act="restore"><span class="cell-icon" style="--c:var(--xfer-rgb)">${icon('upload')}</span><span class="label">Restore from backup</span>${icon('chev-r', 'chev')}</button>
@@ -163,13 +167,11 @@ export function openSettings({ onThemeChange, restartOnboarding } = {}) {
     else if (act === 'budget') openBudgetSheet();
     else if (act === 'categories') openCategoriesManager();
     else if (act === 'recurring') openRecurringManager();
+    else if (act === 'autolog') openAutoLogSheet();
     else if (act === 'quickbtns') openPresetManager();
+    else if (act === 'autobackup') openBackupSheet();
     else if (act === 'backup' || act === 'share-backup') {
-      const name = `benjamins-backup-${todayKey()}.json`;
-      const json = JSON.stringify(exportData());
-      const r = act === 'backup' ? await saveFile(name, 'application/json', json) : await shareFile(name, 'application/json', json);
-      if (r.ok) { setSettings({ lastBackup: Date.now() }); if (act === 'backup') toast('Backup saved', { sub: name, icon: 'check-circle', tone: 'pos' }); }
-      else if (r.error !== 'cancelled') toast('Backup failed', { sub: r.error, icon: 'alert', tone: 'neg' });
+      await backupNow({ share: act === 'share-backup' });
     } else if (act === 'restore') {
       const f = await pickTextFile('.json,application/json,text/plain');
       if (!f) return;

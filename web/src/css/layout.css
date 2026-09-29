@@ -31,6 +31,12 @@ body.presenting { background: var(--present-bg); }
   transform: translate3d(0, calc(var(--sat) * .55 + 4px), 0) scale(.9);
   border-radius: 26px;
 }
+/* Blink: without a fixed raster scale the whole page re-rasters at .93 when the present
+   transition lands (and again at 1 on the way back), a 100 ms+ frame on a mid-range phone; and
+   rounding the corners of a multi-layer page adds a full-screen masked pass to every frame. */
+.blink #app { will-change: transform; }
+.blink #app.presented,
+.blink #app.presented-2 { border-radius: 0; }
 
 /* ---------------------------------------------------------------- aurora */
 .aurora {
@@ -201,7 +207,23 @@ body.presenting { background: var(--present-bg); }
 .edge-bottom > i:nth-child(3) {
   background: linear-gradient(rgb(var(--bg-rgb) / 0) 20%, rgb(var(--bg-rgb) / .6) 100%);
 }
-[data-glass="solid"] .edge > i { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* Blink: one blur pass per edge instead of a stack of three (each is a full render pass on every
+   scroll frame); a single, wider-masked layer reads almost the same. */
+.blink .edge-top > i:nth-child(-n+2),
+.blink .edge-bottom > i:nth-child(1) { display: none; }
+.blink .edge-top > i:nth-child(3) {
+  -webkit-backdrop-filter: blur(9px) saturate(160%);
+  backdrop-filter: blur(9px) saturate(160%);
+  -webkit-mask: linear-gradient(#000 30%, transparent 88%);
+  mask: linear-gradient(#000 30%, transparent 88%);
+}
+.blink .edge-bottom > i:nth-child(2) {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  -webkit-mask: linear-gradient(transparent 5%, #000 60%);
+  mask: linear-gradient(transparent 5%, #000 60%);
+}
+[data-glass="solid"] .edge > i:nth-child(n) { -webkit-backdrop-filter: none; backdrop-filter: none; }
 [data-glass="solid"] .edge-top > i:nth-child(3) { background: linear-gradient(rgb(var(--bg-rgb) / .96) 40%, rgb(var(--bg-rgb) / 0)); }
 
 /* ---------------------------------------------------------------- dock: tab bar + add button */

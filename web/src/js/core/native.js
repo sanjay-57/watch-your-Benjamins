@@ -87,6 +87,73 @@ export function setCanGoBack(can) {
 
 export function minimize() { if (A) call('minimize'); }
 
+// ---------------------------------------------------------------- SMS auto-logging (Android only)
+// The shell reads IOB UPI-debit alerts and queues them; the page drains the queue into the ledger.
+export const smsSupported = !!A && typeof A.getSmsState === 'function';
+
+export function smsState() {
+  if (!smsSupported) return { granted: false, on: false, last4: '' };
+  try { return JSON.parse(A.getSmsState()); } catch { return { granted: false, on: false, last4: '' }; }
+}
+/** Tell the shell which account to watch. Nothing is captured unless on && last4 is 4 digits. */
+export const setSmsConfig = (on, last4, credits) => { if (smsSupported) call('setSmsConfig', !!on, String(last4 || ''), !!credits); };
+export function requestSmsPermission() {
+  if (!smsSupported) return Promise.resolve(false);
+  return new Promise(res => {
+    const off = onNative('smsPermission', d => { off(); res(!!d.granted); });
+    call('requestSmsPermission');
+  });
+}
+export function pendingSms() {
+  if (!smsSupported) return [];
+  try { const l = JSON.parse(A.getPendingSms()); return Array.isArray(l) ? l : []; } catch { return []; }
+}
+export const ackSms = ids => { if (smsSupported && ids.length) call('ackSms', JSON.stringify(ids)); };
+
+// ---------------------------------------------------------------- automatic backups (Android only)
+export const backupSupported = !!A && typeof A.writeBackup === 'function';
+
+/** {set, name?}: the folder chosen for automatic backups (set=false if none or it was deleted). */
+export function backupFolder() {
+  if (!backupSupported) return { set: false };
+  try { return JSON.parse(A.getBackupFolder()); } catch { return { set: false }; }
+}
+/** Opens the system folder picker; resolves {ok, set?, name?, error?}. */
+export function pickBackupFolder() {
+  if (!backupSupported) return Promise.resolve({ ok: false, error: 'unsupported' });
+  markExternal();
+  return new Promise(res => {
+    const off = onNative('backupFolder', d => { off(); res(d); });
+    call('pickBackupFolder');
+  });
+}
+export const clearBackupFolder = () => { if (backupSupported) call('clearBackupFolder'); };
+/** Writes a file into the chosen folder; resolves {ok, name?, error?}. */
+export function writeBackupFile(name, content) {
+  if (!backupSupported) return Promise.resolve({ ok: false, error: 'unsupported' });
+  return new Promise(res => {
+    const off = onNative('backupWritten', d => { clearTimeout(t); off(); res(d); });
+    const t = setTimeout(() => { off(); res({ ok: false, error: 'timeout' }); }, 60000);
+    call('writeBackup', name, content);
+  });
+}
+
+// ---------------------------------------------------------------- widget / tile / shortcut (Android)
+/** 'add' when the app was opened from the widget, tile or launcher shortcut (once), else ''. */
+export function takeLaunchAction() {
+  if (!A || typeof A.takeLaunchAction !== 'function') return '';
+  try { return A.takeLaunchAction() || ''; } catch { return ''; }
+}
+let lastWidget = '';
+/** {title, main, sub}: the text the home-screen widget shows. */
+export function setWidgetData(data) {
+  if (!A || typeof A.setWidgetData !== 'function') return;
+  const json = JSON.stringify(data);
+  if (json === lastWidget) return;
+  lastWidget = json;
+  call('setWidgetData', json);
+}
+
 // ---------------------------------------------------------------- external UI flows
 // System pickers / share sheets send the app to the background ('pause'); the app lock
 // must not trigger when the user comes back from one of those.

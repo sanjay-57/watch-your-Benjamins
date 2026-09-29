@@ -1,8 +1,8 @@
 // Benjamins — app controller.
 import { $, clamp, throttleRaf, debounce, reducedMotion } from './core/util.js';
 import { setCurrency } from './core/money.js';
-import { todayKey, thisMonth } from './core/dates.js';
-import { store, bootFromSnapshot, syncWithIDB, processRecurring, flush, syncUIPrefs, deleteTx, restoreTx, activeAccounts, cardInfo, account, category, usePreset, preset, removePreset, addPreset } from './core/store.js';
+import { todayKey, thisMonth, nowTime, fmtTime, daysInMonth } from './core/dates.js';
+import { store, bootFromSnapshot, syncWithIDB, processRecurring, flush, syncUIPrefs, deleteTx, restoreTx, activeAccounts, cardInfo, account, category, usePreset, preset, resolvePreset, removePreset, addPreset, findAutoDuplicate, budgetCrossing, totals, monthStats } from './core/store.js';
 import * as native from './core/native.js';
 import { nav } from './core/nav.js';
 import { injectSprite } from './ui/icons.js';
@@ -13,7 +13,7 @@ import { setGlassMode, initLight, setLight } from './ui/glass.js';
 import { mountAurora, refreshAurora, holdAurora } from './ui/aurora.js';
 import { applyEngraving } from './ui/engrave.js';
 import { attachSwipe, closeOpenRow } from './ui/swipe.js';
-import { toast, alertDialog, openMenu } from './ui/overlays.js';
+import { toast, alertDialog, confirmDialog, openMenu } from './ui/overlays.js';
 import { icon } from './ui/icons.js';
 import { renderHome } from './views/home.js';
 import { renderActivity, bindActivity, setActivityFilter } from './views/activity.js';
@@ -26,6 +26,9 @@ import { openPresetManager } from './views/presets.js';
 import { money } from './core/money.js';
 import { showOnboarding } from './views/onboarding.js';
 import { showLock } from './views/lock.js';
+import { drainAutoLog, syncAutoLogConfig, approveReview, skipReview, reviewItems, onReviewChange } from './views/autolog.js';
+import { runAutoBackup, snoozeBackupReminder, openBackupSheet, backupNow, backupSupported } from './views/backup.js';
+import { isLocked } from './views/lock.js';
 
 const root = document.documentElement;
 const VIEWS = { home: renderHome, activity: renderActivity, insights: renderInsights, wallet: renderWallet };
@@ -274,19 +277,29 @@ function bindLongPress(sec) {
 
 // one tap on a quick button logs it (double taps within 700 ms are ignored)
 const lastQuick = new Map();
-function quickLog(el) {
+async function quickLog(el) {
   const id = el.dataset.id, now = Date.now();
   if (now - (lastQuick.get(id) || 0) < 700) return;
   lastQuick.set(id, now);
   const p = preset(id);
+  if (p) {
+    // an IOB alert may already have logged this payment: ask before doubling it
+    const dup = findAutoDuplicate({ type: p.type, amount: p.amount, accountId: resolvePreset(p).accountId, date: todayKey(), time: nowTime() });
+    if (dup && !(await confirmDialog({
+      title: 'Already logged?',
+      message: `${money(dup.amount)} on ${account(dup.accountId)?.name || 'this account'} was added automatically at ${fmtTime(dup.time)} from your bank alert. Add ${p.label} as well?`,
+      confirm: 'Add anyway', cancel: 'Cancel', icon: 'copy', tone: 'warn',
+    }))) return;
+  }
   const t = usePreset(id);
   if (!p || !t) { toast('Couldn’t log that', { sub: 'Check the button’s account in Edit', icon: 'alert', tone: 'warn' }); return; }
   native.haptic('success');
   el.classList.remove('logged'); void el.offsetWidth; el.classList.add('logged');
   const c = category(t.categoryId), a = account(t.accountId);
+  const warn = budgetCrossing(t);
   toast(`${t.type === 'income' ? 'Added' : t.type === 'transfer' ? 'Moved' : 'Logged'} ${money(t.amount)}`, {
-    sub: `${t.type === 'transfer' ? '⇄' : c?.emoji || '⚡'} ${p.label} · ${a?.name || ''}`,
-    icon: 'zap', tone: t.type === 'income' ? 'pos' : 'accent',
+    sub: warn || `${t.type === 'transfer' ? '⇄' : c?.emoji || '⚡'} ${p.label} · ${a?.name || ''}`,
+    icon: warn ? 'alert' : 'zap', tone: warn ? 'warn' : t.type === 'income' ? 'pos' : 'accent',
     action: 'Undo',
     onAction: () => { deleteTx(t.id); toast('Removed', { icon: 'undo' }); },
   });
@@ -314,6 +327,12 @@ function bindView(name, sec) {
       case 'presets': openPresetManager(); break;
       case 'preset-new': openTxSheet({ mode: 'button' }); break;
       case 'see-all': setActivityFilter({}); dirty.add('activity'); showTab('activity'); break;
+      case 'review-add': approveReview([el.dataset.id]); break;
+      case 'review-skip': skipReview([el.dataset.id]); break;
+      case 'review-all': approveReview(reviewItems().map(r => r.id)); break;
+      case 'cat-budget': setActivityFilter({ cat: el.dataset.id, month: thisMonth(), type: 'expense' }); dirty.add('activity'); showTab('activity'); break;
+      case 'backup-now': if (backupSupported) openBackupSheet(); else backupNow(); break;
+      case 'backup-later': snoozeBackupReminder(7); markAllDirty(); scheduleRender(); break;
     }
   });
   attachSwipe(sec, onDelete);
@@ -337,6 +356,30 @@ function restartOnboarding() {
   onboarding = showOnboarding({ onDone: afterOnboarding });
 }
 
+// ---------------------------------------------------------------- widget + shortcuts (Android)
+/** The text on the home-screen widget: safe-to-spend today, or the balance when there is no budget. */
+const pushWidget = debounce(() => {
+  if (!store.settings.onboarded || native.platform !== 'android') return;
+  const s = store.settings, T = totals(), ms = monthStats(thisMonth());
+  const fmt = v => money(v, { decimals: 'never' });
+  if (s.hideOnLaunch) return native.setWidgetData({ title: 'Benjamins', main: '••••', sub: 'Amounts hidden' });
+  if (s.budget > 0) {
+    const left = s.budget - ms.expense;
+    const daysLeft = daysInMonth(thisMonth()) - +todayKey().slice(8) + 1;
+    return native.setWidgetData(left >= 0
+      ? { title: 'Safe to spend today', main: fmt(Math.floor(left / daysLeft)), sub: `Balance ${fmt(T.balance)} · ${fmt(left)} left this month` }
+      : { title: 'Over budget', main: `${fmt(-left)} over`, sub: `Balance ${fmt(T.balance)}` });
+  }
+  native.setWidgetData({ title: 'Balance', main: fmt(T.balance), sub: `Spent this month ${fmt(ms.expense)}` });
+}, 600);
+
+/** Opened from the widget, Quick Settings tile or launcher shortcut: go straight to the add sheet. */
+async function launchFromShortcut() {
+  if (native.takeLaunchAction() !== 'add' || !store.settings.onboarded) return;
+  for (let i = 0; i < 600 && isLocked(); i++) await new Promise(r => setTimeout(r, 500)); // wait out the passcode
+  if (!isLocked()) openTxSheet();
+}
+
 // ---------------------------------------------------------------- lifecycle
 let hiddenAt = 0;
 function onHide() {
@@ -351,6 +394,9 @@ function onShow() {
   if (store.settings.lock && store.settings.onboarded && away > 60000 && !external) showLock();
   const created = processRecurring();
   if (created.length) toast(`${created.length} recurring payment${created.length > 1 ? 's' : ''} logged`, { icon: 'repeat' });
+  drainAutoLog();
+  runAutoBackup();
+  pushWidget();
   if (todayKey() !== lastDay) { lastDay = todayKey(); markAllDirty(); scheduleRender(); }
 }
 
@@ -408,6 +454,8 @@ function boot() {
   store.subscribe(ch => {
     if (ch.storageFull) { toast('Storage is full', { sub: 'Export a backup and free some space', icon: 'alert', tone: 'warn' }); return; }
     applySettings();
+    syncAutoLogConfig();
+    pushWidget();
     markAllDirty();
     scheduleRender();
     if (store.txs.length) $('#fab').classList.remove('hint');
@@ -422,6 +470,11 @@ function boot() {
     }
     const created = processRecurring();
     if (created.length) toast(`${created.length} recurring payment${created.length > 1 ? 's' : ''} logged`, { icon: 'repeat' });
+    syncAutoLogConfig();
+    drainAutoLog();
+    runAutoBackup();
+    pushWidget();
+    launchFromShortcut();
   });
 
   // lifecycle + system theme
@@ -429,6 +482,9 @@ function boot() {
   window.addEventListener('pagehide', flush);
   native.onNative('pause', onHide);
   native.onNative('resume', onShow);
+  native.onNative('sms', () => drainAutoLog());
+  native.onNative('shortcut', () => launchFromShortcut());
+  onReviewChange(() => { markAllDirty(); scheduleRender(); });
   native.onNative('systemTheme', d => { nativeDark = !!d.dark; if (store.settings.theme === 'system') applySettings(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (nativeDark == null && store.settings.theme === 'system') applySettings(); });
 

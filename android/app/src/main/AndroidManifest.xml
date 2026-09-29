@@ -3,10 +3,16 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      Deliberately NO permissions — not even INTERNET. The UI is served from the APK's
-      assets (MainActivity.serveAsset), so the process never needs to open a socket and
-      the OS guarantees that data cannot leave the phone from this app.
+      Deliberately NO INTERNET permission. The UI is served from the APK's assets
+      (MainActivity.serveAsset), so the process never needs to open a socket and the OS
+      guarantees that data cannot leave the phone from this app.
+
+      RECEIVE_SMS is the only permission, and it is optional: it lets the app log UPI debits
+      from Indian Overseas Bank alerts. SmsReceiver ignores every message that is not an IOB
+      UPI debit from the account the user configured (nothing else is read or kept), and the
+      feature does nothing until it is switched on in Settings.
     -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <!--
       allowBackup=false: no cloud (Google Drive) backup of the expense data. On Android 12+
@@ -47,6 +53,40 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Home-screen widget: safe-to-spend + a one-tap Add button. -->
+        <receiver
+            android:name=".WidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- Quick Settings tile "Add expense". Only the system may bind to it. -->
+        <service
+            android:name=".AddTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_add"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Only the system can deliver SMS_RECEIVED (BROADCAST_SMS), so other apps can't feed it. -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Minimal read-only provider for files handed to the share sheet (no FileProvider). -->
         <provider

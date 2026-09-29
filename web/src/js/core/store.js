@@ -10,8 +10,8 @@
 //    only when you actually pay the card bill.
 import * as db from './db.js';
 import { uid, debounce } from './util.js';
-import { CURRENCIES, localPrice } from './money.js';
-import { todayKey, nowTime, addDays, addMonths, daysInMonth, dateInMonth, dayDiff, isValidKey } from './dates.js';
+import { CURRENCIES, localPrice, money } from './money.js';
+import { todayKey, nowTime, addDays, addMonths, daysInMonth, dateInMonth, dayDiff, isValidKey, keyOf, parseKey } from './dates.js';
 
 export const DEFAULT_CATEGORIES = [
   // expense
@@ -93,6 +93,9 @@ const DEFAULT_SETTINGS = {
   createdAt: 0,
   lock: null,
   presetsTouched: false,
+  autoLog: { on: false, last4: '', accountId: 'gpay', mode: 'auto', credits: true },
+  autoBackup: { on: false, every: 7, last: 0 },
+  savedFilters: [],
 };
 
 function defaultAccounts() {
@@ -199,6 +202,7 @@ function normTx(t, accts = S.accounts, cats = S.categories) {
     out.categoryId = ok ? t.categoryId : kind === 'income' ? 'other_in' : 'other';
   }
   if (t.recurringId) out.recurringId = str(t.recurringId, 40);
+  if (t.ref) out.ref = str(t.ref, 40); // bank reference of an auto-logged payment (dedupe key)
   return out;
 }
 
@@ -210,6 +214,44 @@ function normRecurring(r) {
     day: Math.min(31, Math.max(1, int(r.day, 1))), next: isValidKey(r.next) ? r.next : todayKey(),
     active: r.active !== false, createdAt: int(r.createdAt, Date.now()),
   };
+}
+
+function normAutoLog(a) {
+  const last4 = String(a?.last4 ?? '').replace(/\D/g, '').slice(-4);
+  return {
+    on: !!a?.on && last4.length === 4,
+    last4: last4.length === 4 ? last4 : '',
+    accountId: str(a?.accountId || DEFAULT_SETTINGS.autoLog.accountId, 40),
+    mode: a?.mode === 'ask' ? 'ask' : 'auto', // 'ask' = approve each payment before it is logged
+    credits: a?.credits !== false, // also log UPI money received, as income
+  };
+}
+
+function normAutoBackup(b) {
+  return { on: !!b?.on, every: [1, 7, 30].includes(int(b?.every)) ? int(b.every) : 7, last: Math.max(0, int(b?.last)) };
+}
+
+const FILTER_TYPES = ['all', 'expense', 'income', 'transfer'];
+const FILTER_METHODS = ['all', 'cash', 'upi', 'card'];
+/** Saved Activity searches: only the known fields survive, so a bad backup can't break the filter. */
+export function normFilter(f = {}) {
+  const num = v => (Number.isFinite(Number(v)) && v !== '' && v != null && Number(v) >= 0 ? Math.round(Number(v)) : null);
+  return {
+    q: str(f.q, 60),
+    type: FILTER_TYPES.includes(f.type) ? f.type : 'all',
+    method: FILTER_METHODS.includes(f.method) ? f.method : 'all',
+    month: f.month === 'all' || /^\d{4}-\d{2}$/.test(f.month || '') ? f.month : 'all',
+    cat: f.cat ? str(f.cat, 40) : null,
+    acct: f.acct ? str(f.acct, 40) : null,
+    from: isValidKey(f.from) ? f.from : '',
+    to: isValidKey(f.to) ? f.to : '',
+    min: num(f.min),
+    max: num(f.max),
+  };
+}
+function normSavedFilters(list) {
+  return (Array.isArray(list) ? list : []).filter(x => x && x.id && x.name).slice(0, 12)
+    .map(x => ({ id: str(x.id, 40), name: str(x.name, 30), f: normFilter(x.f) }));
 }
 
 const pickOne = (v, list, d) => (list.includes(v) ? v : d);
@@ -236,6 +278,9 @@ function normSettings(s) {
     createdAt: int(s.createdAt, Date.now()),
     lock,
     presetsTouched: !!s.presetsTouched,
+    autoLog: normAutoLog(s.autoLog),
+    autoBackup: normAutoBackup(s.autoBackup),
+    savedFilters: normSavedFilters(s.savedFilters),
   };
 }
 
@@ -422,6 +467,47 @@ export function restoreTx(t) {
   S.txs.push(n);
   sortTxs();
   commit({ txPut: [n] });
+}
+
+const minutesOf = hhmm => { const [h, m] = String(hhmm || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+
+/**
+ * Add payments read from bank alerts in one commit. Each item is {id, ref, tx}.
+ *  - `ref` already in the ledger → skipped (a re-delivered alert is never counted twice).
+ *  - a payment you already logged by hand (same amount/account/type, no reference yet, within
+ *    45 minutes) is linked to the alert instead of being added again.
+ * Returns {created, matched, done}: `done` are the ids that are safely stored.
+ */
+export function importAutoTxs(list) {
+  if (!isReady()) return { created: [], matched: [], done: [] };
+  const known = new Set(S.txs.map(t => t.ref).filter(Boolean));
+  const created = [], matched = [], done = [];
+  for (const d of list) {
+    if (d.ref && known.has(d.ref)) { done.push(d.id); continue; }
+    const t = normTx({ ...d.tx, id: undefined, ref: d.ref, createdAt: Date.now() });
+    if (!t) continue; // unusable (e.g. account was deleted): stays queued for another try
+    const manual = S.txs.find(x => !x.ref && x.type === t.type && x.amount === t.amount && x.accountId === t.accountId
+      && x.date === t.date && Math.abs(minutesOf(x.time) - minutesOf(t.time)) <= 45);
+    if (manual) {
+      manual.ref = t.ref; manual.updatedAt = Date.now();
+      matched.push(manual);
+    } else {
+      S.txs.push(t);
+      created.push(t);
+    }
+    if (t.ref) known.add(t.ref);
+    done.push(d.id);
+  }
+  if (created.length || matched.length) { sortTxs(); commit({ txPut: [...created, ...matched] }); }
+  return { created, matched, done };
+}
+
+/** An automatically logged payment that looks like the one being entered by hand (else null). */
+export function findAutoDuplicate({ type, amount, accountId, date, time }) {
+  if (type !== 'expense' && type !== 'income') return null;
+  const a = Math.abs(int(amount));
+  return S.txs.find(t => t.ref && t.type === type && t.amount === a && t.accountId === accountId && t.date === date
+    && Math.abs(minutesOf(t.time) - minutesOf(time)) <= 60) || null;
 }
 
 // settings
@@ -783,10 +869,18 @@ export const monthStats = memo(mk => {
   return r;
 });
 
-/** Balance (cash + GPay/bank) at the end of each of the last `days` days (for the sparkline). */
-export const balanceSeries = memo(days => {
+/**
+ * Running balance (cash + GPay/bank) over the last `days` days, as [x 0..1, value] points for the
+ * Home sparkline. Every transaction is its own short, steep step at the moment it happened, so a
+ * spend always shows as a drop, even on a day that also had income (a per-day series only shows
+ * the day's net). A history younger than the window starts just before its first transaction
+ * instead of drawing weeks of flat line with everything crammed into the last pixel.
+ */
+export function balanceSeries(days) {
+  const now = Date.now();
   const today = todayKey();
-  const start = addDays(today, -(days - 1));
+  const startKey = addDays(today, -(days - 1));
+  const from = parseKey(startKey).getTime();
   const cards = new Set(S.accounts.filter(a => a.type === 'card').map(a => a.id));
   const on = id => (id && !cards.has(id) ? 1 : 0);
   const effect = t => {
@@ -795,22 +889,36 @@ export const balanceSeries = memo(days => {
     if (t.type === 'transfer') return (on(t.toAccountId) - on(t.accountId)) * t.amount;
     return 0;
   };
+  // logged on its own day: the moment it was logged; back-dated or imported: midday on its date
+  const when = t => {
+    const c = new Date(t.createdAt || 0);
+    return Math.min(now, keyOf(c) === t.date ? c.getTime() : parseKey(t.date).getTime() + 43200000);
+  };
   let bal = totals().balance;
-  const perDay = new Map();
+  const ev = [];
   for (const t of S.txs) {
-    if (t.date > today) { bal -= effect(t); continue; }
-    if (t.date < start) break;
-    inc(perDay, t.date, effect(t));
+    const e = effect(t);
+    if (t.date > today) { bal -= e; continue; }
+    if (t.date < startKey) break;
+    if (e) ev.push([when(t), e]);
   }
-  const out = new Array(days);
-  let d = today;
-  for (let i = days - 1; i >= 0; i--) {
-    out[i] = bal;
-    bal -= perDay.get(d) || 0;
-    d = addDays(d, -1);
+  if (!ev.length) return [[0, bal], [1, bal]];
+  ev.sort((a, b) => a[0] - b[0]);
+  const first = ev[0][0];
+  const t0 = Math.max(from, first - Math.max((now - first) * 0.15, 3600000));
+  const span = Math.max(1, now - t0);
+  const ramp = 0.012; // width of one step, as a share of the chart
+  let b = ev.reduce((s, [, e]) => s - e, bal); // balance at t0
+  const pts = [[0, b]];
+  for (const [t, e] of ev) {
+    const x = Math.max(0, (t - t0) / span);
+    pts.push([Math.max(pts[pts.length - 1][0], x - ramp), b]);
+    b += e;
+    pts.push([Math.max(pts[pts.length - 1][0], x), b]);
   }
-  return out;
-});
+  pts.push([1, b]);
+  return pts;
+}
 
 export const trend = memo((mk, n) => {
   const out = [];
@@ -882,6 +990,67 @@ export const upcoming = memo(() => {
 });
 
 /** Transactions touching an account, newest first, with running balance after each. */
+// ---------------------------------------------------------------- budgets & forecast
+const WARN_AT = 0.8;
+
+/**
+ * After an expense is saved: a short warning if it just pushed its category (or the whole month)
+ * past 80% or 100% of a budget, else null. Meant for the "Spent ₹X" toast.
+ */
+export function budgetCrossing(t) {
+  if (!t || t.type !== 'expense' || !isReady()) return null;
+  const ms = monthStats(t.date.slice(0, 7));
+  const check = (label, spent, budget) => {
+    if (!(budget > 0)) return null;
+    const before = spent - t.amount;
+    if (spent > budget && before <= budget) return { over: true, text: `${label}: over budget by ${money(spent - budget)}` };
+    if (spent >= budget * WARN_AT && before < budget * WARN_AT) return { over: false, text: `${label} is at ${Math.round((spent / budget) * 100)}% of its budget` };
+    return null;
+  };
+  const c = category(t.categoryId);
+  const a = check(`${c?.emoji || ''} ${c?.name || 'Category'}`.trim(), ms.byCat.get(t.categoryId) || 0, c?.budget || 0);
+  const b = check('Monthly budget', ms.expense, S.settings.budget);
+  const hit = [a, b].filter(Boolean).sort((x, y) => y.over - x.over)[0];
+  return hit ? hit.text : null;
+}
+
+/** Categories at or past 80% of their monthly budget (this month), worst first. */
+export const budgetWatch = memo(() => {
+  const ms = monthStats(todayKey().slice(0, 7));
+  const out = [];
+  for (const c of S.categories) {
+    if (c.archived || !(c.budget > 0) || c.kind !== 'expense') continue;
+    const spent = ms.byCat.get(c.id) || 0;
+    if (spent >= c.budget * WARN_AT) out.push({ category: c, spent, budget: c.budget, pct: Math.round((spent / c.budget) * 100) });
+  }
+  return out.sort((a, b) => b.pct - a.pct);
+});
+
+const FIXED_CATS = new Set(['rent', 'emi', 'bills', 'subscriptions', 'education']);
+
+/**
+ * Month-end spending forecast: what is already spent, plus everyday spending at the pace so far
+ * for the days left, plus recurring payments still due this month. Fixed bills and recurring
+ * payments are kept out of the pace so a big rent payment on day 1 doesn't inflate it.
+ */
+export const forecast = memo(() => {
+  const today = todayKey();
+  const mk = today.slice(0, 7);
+  const dim = daysInMonth(mk);
+  const dayN = +today.slice(8);
+  const ms = monthStats(mk);
+  if (dayN < 3 || ms.expCount < 2) return null;
+  let flex = 0;
+  for (const t of ms.txs) if (t.type === 'expense' && !t.recurringId && !FIXED_CATS.has(t.categoryId)) flex += t.amount;
+  const daysLeft = dim - dayN;
+  let coming = 0;
+  for (const r of S.recurring) {
+    if (r.active && r.type === 'expense' && r.next > today && r.next.startsWith(mk)) coming += r.amount;
+  }
+  const proj = Math.round(ms.expense + (flex / dayN) * daysLeft + coming);
+  return { proj, spent: ms.expense, dayN, dim, daysLeft, coming };
+});
+
 export const accountLedger = memo(id => {
   const list = S.txs.filter(t => t.accountId === id || t.toAccountId === id);
   let bal = balances().get(id) || 0;

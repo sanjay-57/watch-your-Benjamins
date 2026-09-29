@@ -55,11 +55,14 @@ function size(a) {
   a.h = a.canvas.height = Math.max(48, Math.round(H / 5));
 }
 
-// Driven by a 25 fps timer, not a rAF loop: a slow drift needs no more, and a permanent rAF
-// would wake the renderer on every vsync of a 90/120 Hz panel. Every repaint also makes each
-// glass surface above re-filter its backdrop, so the drift freezes while anything is held —
-// a finger on the screen, a scroll, an open sheet — and interaction frames stay light.
+// Driven by a timer, not a rAF loop: a slow drift needs no more, and a permanent rAF would
+// wake the renderer on every vsync of a 90/120 Hz panel. Every repaint also makes each glass
+// surface above re-filter its backdrop, so the drift freezes while anything is held — a finger
+// on the screen, a scroll, an open sheet — and interaction frames stay light. Blink pays for a
+// whole frame per repaint, so it drifts at 12.5 fps (the fastest blob moves ~1 canvas px per
+// step, which the upscale smooths away); elsewhere 25 fps.
 const holds = new Set();
+const step = () => (document.documentElement.classList.contains('blink') ? 80 : 40);
 let timer = 0;
 const t0 = performance.now() - 12000;
 function tick() {
@@ -69,14 +72,17 @@ function tick() {
     const t = (performance.now() - t0) / 1000;
     for (const a of all) if (a.host.isConnected && a.host.offsetParent !== null) draw(a, t);
   }
-  timer = setTimeout(tick, 40);
+  timer = setTimeout(tick, step());
 }
 
 function kick() {
-  if (!timer && !reducedMotion()) timer = setTimeout(tick, 40);
+  if (!timer && !reducedMotion()) timer = setTimeout(tick, step());
 }
 
 const releases = new Map(); // key → pending delayed release
+/** True while a touch, scroll or sheet holds the page still (other ambient motion defers to it too). */
+export const interacting = () => holds.size > 0;
+
 /** Freeze (on) / resume (off) the drift for `key`; `delay` ms before a resume takes effect. */
 export function holdAurora(key, on, delay = 0) {
   clearTimeout(releases.get(key));
